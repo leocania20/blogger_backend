@@ -1,0 +1,12 @@
+# Build e binários
+bin/
+obj/
+
+# Usuário e IDE
+*.user
+*.vs/
+.vscode/
+
+# Banco de dados
+*.db
+*.sqlite
