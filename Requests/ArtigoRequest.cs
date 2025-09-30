@@ -1,6 +1,7 @@
 namespace blogger_backend.Models;
 
 public record ArtigoRequest(
+   
     string Titulo,
     string Slug,
     string Conteudo,
@@ -8,5 +9,11 @@ public record ArtigoRequest(
     bool IsPublicado,
     int CategoriaId,
     int AutorId,
-    int? FonteId
+    int? FonteId,
+    string? Imagem
+
 );
+
+
+
+

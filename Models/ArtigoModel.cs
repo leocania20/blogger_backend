@@ -12,6 +12,8 @@ namespace blogger_backend.Models
         public DateTime? DataPublicacao { get; set; }
         public bool IsPublicado { get; set; } = false;
 
+        public string? Imagem { get; set; } 
+
         public int CategoriaId { get; set; }
         public CategoriaModel Categoria { get; set; } = null!;
 

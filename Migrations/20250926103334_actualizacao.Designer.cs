@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using blogger_backend.Data;
 
@@ -10,9 +11,11 @@ using blogger_backend.Data;
 namespace blogger_backend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250926103334_actualizacao")]
+    partial class Actualizacao
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.9");
@@ -258,40 +261,6 @@ namespace blogger_backend.Migrations
                     b.ToTable("Notificacoes");
                 });
 
-            modelBuilder.Entity("blogger_backend.Models.PesquisaCustomizadaModel", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("AutorId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("CategoriaId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("DataCriacao")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int?>("FonteId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("UsuarioId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AutorId");
-
-                    b.HasIndex("CategoriaId");
-
-                    b.HasIndex("FonteId");
-
-                    b.HasIndex("UsuarioId");
-
-                    b.ToTable("PesquisasCustomizadas");
-                });
-
             modelBuilder.Entity("blogger_backend.Models.UsuarioModel", b =>
                 {
                     b.Property<int>("Id")
@@ -401,38 +370,6 @@ namespace blogger_backend.Migrations
                     b.Navigation("Usuario");
                 });
 
-            modelBuilder.Entity("blogger_backend.Models.PesquisaCustomizadaModel", b =>
-                {
-                    b.HasOne("blogger_backend.Models.AutorModel", "Autor")
-                        .WithMany()
-                        .HasForeignKey("AutorId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("blogger_backend.Models.CategoriaModel", "Categoria")
-                        .WithMany()
-                        .HasForeignKey("CategoriaId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("blogger_backend.Models.FonteModel", "Fonte")
-                        .WithMany()
-                        .HasForeignKey("FonteId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("blogger_backend.Models.UsuarioModel", "Usuario")
-                        .WithMany("PesquisasCustomizadas")
-                        .HasForeignKey("UsuarioId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Autor");
-
-                    b.Navigation("Categoria");
-
-                    b.Navigation("Fonte");
-
-                    b.Navigation("Usuario");
-                });
-
             modelBuilder.Entity("blogger_backend.Models.ArtigoModel", b =>
                 {
                     b.Navigation("Comentarios");
@@ -460,8 +397,6 @@ namespace blogger_backend.Migrations
                     b.Navigation("Comentarios");
 
                     b.Navigation("Notificacoes");
-
-                    b.Navigation("PesquisasCustomizadas");
                 });
 #pragma warning restore 612, 618
         }
