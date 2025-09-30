@@ -13,5 +13,7 @@ namespace blogger_backend.Models
 
         public ICollection<ComentarioModel> Comentarios { get; set; } = new List<ComentarioModel>();
         public ICollection<NotificacaoModel> Notificacoes { get; set; } = new List<NotificacaoModel>();
+        public ICollection<PesquisaCustomizadaModel> PesquisasCustomizadas { get; set; } = new List<PesquisaCustomizadaModel>();
+
     }
 }

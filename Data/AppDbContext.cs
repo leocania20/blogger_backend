@@ -17,6 +17,7 @@ namespace blogger_backend.Data
         public DbSet<ComentarioModel> Comentarios { get; set; } = null!;
         public DbSet<NewsletterModel> Newsletters { get; set; } = null!;
         public DbSet<NotificacaoModel> Notificacoes { get; set; } = null!;
+        public DbSet<PesquisaCustomizadaModel> PesquisasCustomizadas { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -64,6 +65,30 @@ namespace blogger_backend.Data
                         .WithMany(a => a.Notificacoes)
                         .HasForeignKey(n => n.ArtigoId)
                         .IsRequired(false);
+                        
+            modelBuilder.Entity<PesquisaCustomizadaModel>()
+                .HasOne(p => p.Usuario)
+                .WithMany(u => u.PesquisasCustomizadas)
+                .HasForeignKey(p => p.UsuarioId);
+
+            modelBuilder.Entity<PesquisaCustomizadaModel>()
+                .HasOne(p => p.Categoria)
+                .WithMany()
+                .HasForeignKey(p => p.CategoriaId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PesquisaCustomizadaModel>()
+                .HasOne(p => p.Autor)
+                .WithMany()
+                .HasForeignKey(p => p.AutorId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PesquisaCustomizadaModel>()
+                .HasOne(p => p.Fonte)
+                .WithMany()
+                .HasForeignKey(p => p.FonteId)
+                .OnDelete(DeleteBehavior.Restrict);
+                    
         }
     }
 }

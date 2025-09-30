@@ -6,3 +6,13 @@ public record UsuarioRequest(
     string Senha,
     string Role
 );
+public record UsuarioRegisterRequest(
+        string Nome,
+        string Email,
+        string Senha
+    );
+
+    public record UsuarioLoginRequest(
+        string Email,
+        string Senha
+    );

@@ -1,34 +1,67 @@
 using Microsoft.EntityFrameworkCore;
 using blogger_backend.Models;
 using blogger_backend.Data;
+using blogger_backend.Utils;
+using Microsoft.AspNetCore.Identity;
 
 namespace blogger_backend.Routes;
 
 public static class UsuarioRoute
 {
-    public static void UsuarioRoutes(this WebApplication app)
+    public static void UsuarioRoutes(this WebApplication app, IConfiguration config)
     {
         var route = app.MapGroup("/usuario");
 
-        // POST usando UsuarioRequest
-        route.MapPost("", async (UsuarioRequest req, AppDbContext context) =>
+        // === CRIAR USUÁRIO ===
+        route.MapPost("", async (UsuarioRequest req, AppDbContext context, IPasswordHasher<UsuarioModel> hasher) =>
         {
+            if (await context.Usuarios.AnyAsync(u => u.Email == req.Email))
+                return Results.BadRequest(new { Error = "Já existe um usuário com este e-mail." });
+
             var usuario = new UsuarioModel
             {
                 Nome = req.Nome,
                 Email = req.Email,
-                SenhaHash = HashPassword(req.Senha), // proteger senha
                 Role = req.Role,
                 Ativo = true,
-                DataCadastro = DateTime.UtcNow
+                DataCadastro = DateTime.UtcNow,
+                SenhaHash = hasher.HashPassword(null!, req.Senha) // gera hash seguro
             };
 
             await context.Usuarios.AddAsync(usuario);
             await context.SaveChangesAsync();
-            return Results.Created($"/usuario/{usuario.Id}", usuario);
+
+            return Results.Created($"/usuario/{usuario.Id}", new {
+                usuario.Id,
+                usuario.Nome,
+                usuario.Email,
+                usuario.Role,
+                usuario.Ativo,
+                usuario.DataCadastro
+            });
         });
 
-        // GET
+        // === LOGIN (JWT) ===
+        route.MapPost("/login", async (
+            UsuarioLoginRequest req,
+            AppDbContext context,
+            IPasswordHasher<UsuarioModel> hasher) =>
+        {
+            var usuario = await context.Usuarios.FirstOrDefaultAsync(u => u.Email == req.Email);
+            if (usuario == null || !usuario.Ativo)
+                return Results.Unauthorized();
+
+            var result = hasher.VerifyHashedPassword(usuario, usuario.SenhaHash, req.Senha);
+            if (result == PasswordVerificationResult.Failed)
+                return Results.Unauthorized();
+
+            string secretKey = config["Jwt:Key"] ?? "chave-secreta-superforte-com-32-caracteres!";
+            string token = JwtTokenService.GenerateToken(usuario.Email, usuario.Role, secretKey);
+
+            return Results.Ok(new { Token = token, Usuario = usuario.Email, Role = usuario.Role });
+        });
+
+        // === LISTAR USUÁRIOS ===
         route.MapGet("", async (AppDbContext context) =>
         {
             var usuarios = await context.Usuarios.ToListAsync();
@@ -37,8 +70,8 @@ public static class UsuarioRoute
             }));
         });
 
-        // PUT
-        route.MapPut("/{id:int}", async (int id, UsuarioRequest req, AppDbContext context) =>
+        // === ATUALIZAR USUÁRIO ===
+        route.MapPut("/{id:int}", async (int id, UsuarioRequest req, AppDbContext context, IPasswordHasher<UsuarioModel> hasher) =>
         {
             var usuario = await context.Usuarios.FirstOrDefaultAsync(u => u.Id == id);
             if (usuario == null) return Results.NotFound();
@@ -46,27 +79,35 @@ public static class UsuarioRoute
             usuario.Nome = req.Nome;
             usuario.Email = req.Email;
             usuario.Role = req.Role;
-            usuario.Ativo = true; // manter ativo ao atualizar
+            usuario.Ativo = true;
+
+            // se senha foi enviada, atualiza
+            if (!string.IsNullOrWhiteSpace(req.Senha))
+            {
+                usuario.SenhaHash = hasher.HashPassword(usuario, req.Senha);
+            }
+
             await context.SaveChangesAsync();
-            return Results.Ok(usuario);
+
+            return Results.Ok(new {
+                usuario.Id,
+                usuario.Nome,
+                usuario.Email,
+                usuario.Role,
+                usuario.Ativo,
+                usuario.DataCadastro
+            });
         });
 
-        // DELETE
+        // === SOFT DELETE ===
         route.MapDelete("/{id:int}", async (int id, AppDbContext context) =>
         {
             var usuario = await context.Usuarios.FirstOrDefaultAsync(u => u.Id == id);
             if (usuario == null) return Results.NotFound();
 
-            usuario.Ativo = false; // Soft delete
+            usuario.Ativo = false;
             await context.SaveChangesAsync();
-            return Results.Ok();
+            return Results.Ok(new { Message = "Usuário desativado com sucesso." });
         });
-    }
-
-    // Exemplo de função de hash de senha
-    private static string HashPassword(string senha)
-    {
-        // Aqui você pode usar um hash real, ex: BCrypt
-        return Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(senha));
     }
 }
