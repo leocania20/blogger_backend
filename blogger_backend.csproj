@@ -21,5 +21,11 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.4" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />
   </ItemGroup>
-
+    <!-- 👇 Adiciona este bloco para garantir que o banco vai junto no publish -->
+  <ItemGroup>
+    <None Include="blogger_backend.db" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
+
+
+

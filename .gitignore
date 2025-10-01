@@ -8,5 +8,4 @@ obj/
 .vscode/
 
 # Banco de dados
-*.db
-*.sqlite
+
