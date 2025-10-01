@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using blogger_backend.Models;
 using blogger_backend.Data;
+using Microsoft.AspNetCore.Mvc;
 
 public static class PesquisaCustomizadaRoute
 {
