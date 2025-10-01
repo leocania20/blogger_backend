@@ -62,7 +62,7 @@ public static class UsuarioRoute
             string secretKey = config["Jwt:Key"] ?? "chave-secreta-superforte-com-32-caracteres!";
             string token = JwtTokenService.GenerateToken(usuario.Email, usuario.Role, secretKey);
 
-            return Results.Ok(new { Token = token, Usuario = usuario.Email, Role = usuario.Role });
+            return Results.Ok(new { Token = token, Usuario = usuario.Email, Role = usuario.Role, Id = usuario.Id, nome = usuario.Nome });
         });
 
         // Post
