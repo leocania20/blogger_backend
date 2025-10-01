@@ -50,7 +50,7 @@ public static class CategoriaRoute
             return Results.Ok(categoria);
         });
 
-        // DELETE (soft delete)
+        // DELETE 
         route.MapDelete("/{id:int}", async (int id, AppDbContext context) =>
         {
             var categoria = await context.Categorias.FirstOrDefaultAsync(c => c.Id == id && c.Ativo);

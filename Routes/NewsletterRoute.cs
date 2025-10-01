@@ -45,7 +45,7 @@ public static class NewsletterRoute
             return Results.Ok(newsletter);
         });
 
-        // DELETE (soft delete)
+        // DELETE 
         route.MapDelete("/{id:int}", async (int id, AppDbContext context) =>
         {
             var newsletter = await context.Newsletters.FirstOrDefaultAsync(n => n.Id == id && n.Ativo);

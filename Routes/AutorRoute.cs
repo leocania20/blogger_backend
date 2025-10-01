@@ -51,13 +51,13 @@ public static class AutorRoute
             return Results.Ok(autor);
         });
 
-        // DELETE (soft delete)
+        // DELETE 
         route.MapDelete("/{id:int}", async (int id, AppDbContext context) =>
         {
             var autor = await context.Autores.FirstOrDefaultAsync(a => a.Id == id && a.Ativo);
             if (autor == null) return Results.NotFound();
 
-            autor.Ativo = false; // Soft delete
+            autor.Ativo = false; 
             await context.SaveChangesAsync();
             return Results.Ok();
         });
