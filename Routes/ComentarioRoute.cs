@@ -51,7 +51,7 @@ public static class ComentarioRoute
             return Results.Ok(comentario);
         });
 
-        // DELETE (soft delete)
+        // DELETE 
         route.MapDelete("/{id:int}", async (int id, AppDbContext context) =>
         {
             var comentario = await context.Comentarios.FirstOrDefaultAsync(c => c.Id == id && c.Ativo);

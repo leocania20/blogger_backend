@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: blogger-backend
+    env: docker
+    plan: free
+    autoDeploy: true
+    buildCommand: "dotnet publish -c Release -o out"
+    startCommand: "dotnet out/blogger_backend.dll"

@@ -1,8 +1,7 @@
-using Microsoft.EntityFrameworkCore;
-using blogger_backend.Models;
 using blogger_backend.Data;
+using blogger_backend.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 
 namespace blogger_backend.Routes;
 
@@ -12,7 +11,7 @@ public static class ArtigoRoute
     {
         var route = app.MapGroup("/artigo");
 
-        // POST
+        // post
         route.MapPost("", async (ArtigoRequest req, AppDbContext context) =>
         {
             var artigo = new ArtigoModel
@@ -34,49 +33,76 @@ public static class ArtigoRoute
             await context.SaveChangesAsync();
             return Results.Created($"/artigo/{artigo.Id}", artigo);
         });
-        // GET
-        route.MapGet("completo", async (AppDbContext context) =>
-        {
-            var artigos = await context.Artigos
-                                    .Include(a => a.Categoria)
-                                    .Include(a => a.Autor)
-                                    .Include(a => a.Fonte)
-                                    .Where(a => a.IsPublicado)
-                                    .Select(a => new ArtigoResponse(
 
-                                        a.Titulo,
-                                        a.Slug,
-                                        a.Conteudo,
-                                        a.Resumo,
-                                        a.Imagem,
-                                        a.Autor.Nome,
-                                        a.DataCriacao
-                                    ))
-                                    .ToListAsync();
+        // get
+        route.MapGet("completo", async (
+            int? id,
+            string? titulo,
+            AppDbContext context) =>
+        {
+            var query = context.Artigos
+                               .Include(a => a.Categoria)
+                               .Include(a => a.Autor)
+                               .Include(a => a.Fonte)
+                               .Where(a => a.IsPublicado)
+                               .AsQueryable();
+
+            if (id.HasValue)
+                query = query.Where(a => a.Id == id.Value);
+
+            if (!string.IsNullOrWhiteSpace(titulo))
+                query = query.Where(a => a.Titulo.ToLower().Contains(titulo.ToLower()));
+
+            var artigos = await query
+                .Select(a => new ArtigoResponse(
+                    a.Titulo,
+                    a.Slug,
+                    a.Conteudo,
+                    a.Resumo,
+                    a.Imagem,
+                    a.Autor.Nome,
+                    a.DataCriacao
+                ))
+                .ToListAsync();
 
             return Results.Ok(artigos);
         });
-        // GET simplificado (lista de artigos com menos dados)
-        route.MapGet("/paginaInical", async (AppDbContext context) =>
-        {
-            var artigos = await context.Artigos
-                                    .Include(a => a.Categoria)
-                                    .Include(a => a.Autor)
-                                    .Include(a => a.Fonte)
-                                    .Where(a => a.IsPublicado)
-                                    .Select(a => new
-                                    {
-                                        a.Titulo,
-                                        a.Imagem,
-                                        a.DataCriacao,
-                                        Autor = a.Autor.Nome,
-                                        a.Resumo
-                                    })
-                                    .ToListAsync();
 
-            return Results.Ok(artigos);
+        // get
+        route.MapGet("/paginaInicial", async (
+            int page,
+            AppDbContext context) =>
+        {
+            int pageSize = 6;
+            if (page < 1) page = 1;
+
+            var artigos = await context.Artigos
+                .Include(a => a.Categoria)
+                .Include(a => a.Autor)
+                .Include(a => a.Fonte)
+                .Where(a => a.IsPublicado)
+                .OrderByDescending(a => a.DataCriacao)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(a => new
+                {
+                    a.Titulo,
+                    a.Imagem,
+                    a.DataCriacao,
+                    Autor = a.Autor.Nome,
+                    a.Resumo
+                })
+                .ToListAsync();
+
+            return Results.Ok(new
+            {
+                Pagina = page,
+                Total = await context.Artigos.CountAsync(a => a.IsPublicado),
+                Artigos = artigos
+            });
         });
-        // PUT
+
+        // put
         route.MapPut("/{id:int}", async (int id, ArtigoRequest req, AppDbContext context) =>
         {
             var artigo = await context.Artigos.FirstOrDefaultAsync(a => a.Id == id);
@@ -96,77 +122,86 @@ public static class ArtigoRoute
             await context.SaveChangesAsync();
             return Results.Ok(artigo);
         });
-        // DELETE (soft delete)
+
+        //del
         route.MapDelete("/{id:int}", async (int id, AppDbContext context) =>
         {
             var artigo = await context.Artigos.FirstOrDefaultAsync(a => a.Id == id);
             if (artigo == null) return Results.NotFound();
 
-            artigo.IsPublicado = false; // Soft delete
+            artigo.IsPublicado = false;
             await context.SaveChangesAsync();
             return Results.Ok();
         });
-        // GET Pesquisa avançada
+
+        // search
         route.MapGet("/pesquisar", async (
-   string? titulo,
-   [FromQuery] int[]? categorias,
-   [FromQuery] int[]? fontes,
-   DateTime? data,
-   AppDbContext context) =>
-{
-    var query = context.Artigos
-        .Include(a => a.Categoria)
-        .Include(a => a.Autor)
-        .Include(a => a.Fonte)
-        .Where(a => a.IsPublicado)
-        .AsQueryable();
-
-    // Se nenhum filtro for passado, retorna todos publicados
-    if (string.IsNullOrWhiteSpace(titulo) &&
-        (categorias == null || !categorias.Any()) &&
-        (fontes == null || !fontes.Any()) &&
-        !data.HasValue)
-    {
-        return Results.Ok(await query
-            .Select(a => new
-            {
-                a.Titulo,
-                a.Imagem,
-                a.DataCriacao,
-                Autor = a.Autor.Nome,
-                a.Resumo
-            }).ToListAsync());
-    }
-
-    // Filtro OR – pelo menos um critério deve bater
-    query = query.Where(a =>
-        (!string.IsNullOrWhiteSpace(titulo) && a.Titulo.ToLower().Contains(titulo.ToLower())) ||
-        (categorias != null && categorias.Contains(a.CategoriaId)) ||
-        (fontes != null && a.FonteId != null && fontes.Contains(a.FonteId.Value)) ||
-        (data.HasValue && a.DataCriacao.Date == data.Value.Date) // compara apenas a data
-    );
-
-    var artigos = await query
-        .Select(a => new
+            string? titulo,
+            [FromQuery] int[]? categorias,
+            [FromQuery] int[]? fontes,
+            DateTime? data,
+            int page,
+            AppDbContext context) =>
         {
-            a.Titulo,
-            a.Imagem,
-            a.DataCriacao,
-            Autor = a.Autor.Nome,
-            a.Resumo
-        })
-        .ToListAsync();
+            int pageSize = 3;
+            if (page < 1) page = 1;
 
-    // Logs de debug
-    Console.WriteLine($"Titulo: {titulo}");
-    Console.WriteLine($"Categorias: {(categorias == null ? "Nenhuma" : string.Join(",", categorias))}");
-    Console.WriteLine($"Fontes: {(fontes == null ? "Nenhuma" : string.Join(",", fontes))}");
-    Console.WriteLine($"Data: {data}");
-    Console.WriteLine($"Artigos retornados: {artigos.Count}");
+            var query = context.Artigos
+                .Include(a => a.Categoria)
+                .Include(a => a.Autor)
+                .Include(a => a.Fonte)
+                .Where(a => a.IsPublicado)
+                .AsQueryable();
 
-    return Results.Ok(artigos);
-});
-        // POST upload imagem
+            if (string.IsNullOrWhiteSpace(titulo) &&
+                (categorias == null || !categorias.Any()) &&
+                (fontes == null || !fontes.Any()) &&
+                !data.HasValue)
+            {
+                return Results.Ok(await query
+                    .OrderByDescending(a => a.DataCriacao)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .Select(a => new
+                    {
+                        a.Titulo,
+                        a.Imagem,
+                        a.DataCriacao,
+                        Autor = a.Autor.Nome,
+                        a.Resumo
+                    }).ToListAsync());
+            }
+
+            query = query.Where(a =>
+                (!string.IsNullOrWhiteSpace(titulo) && a.Titulo.ToLower().Contains(titulo.ToLower())) ||
+                (categorias != null && categorias.Contains(a.CategoriaId)) ||
+                (fontes != null && a.FonteId != null && fontes.Contains(a.FonteId.Value)) ||
+                (data.HasValue && a.DataCriacao.Date == data.Value.Date)
+            );
+
+            var artigos = await query
+                .OrderByDescending(a => a.DataCriacao)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(a => new
+                {
+                    a.Titulo,
+                    a.Imagem,
+                    a.DataCriacao,
+                    Autor = a.Autor.Nome,
+                    a.Resumo
+                })
+                .ToListAsync();
+
+            return Results.Ok(new
+            {
+                Pagina = page,
+                Total = await query.CountAsync(),
+                Artigos = artigos
+            });
+        });
+
+        // uplload img 
         route.MapPost("/upload-imagem", async (HttpRequest request) =>
         {
             var form = await request.ReadFormAsync();
@@ -175,12 +210,10 @@ public static class ArtigoRoute
             if (file == null || file.Length == 0)
                 return Results.BadRequest("Nenhuma imagem enviada.");
 
-            // Caminho da pasta de upload
             var uploadsPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "artigos");
             if (!Directory.Exists(uploadsPath))
                 Directory.CreateDirectory(uploadsPath);
 
-            // Nome único para a imagem
             var fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
             var filePath = Path.Combine(uploadsPath, fileName);
 
@@ -189,9 +222,8 @@ public static class ArtigoRoute
                 await file.CopyToAsync(stream);
             }
 
-            // URL que será salva no banco
             var url = $"/uploads/artigos/{fileName}";
             return Results.Ok(new { Url = url });
         });
-   }
+    }
 }

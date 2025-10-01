@@ -48,7 +48,7 @@ public static class FonteRoute
             return Results.Ok(fonte);
         });
 
-        // DELETE (soft delete)
+        // DELETE 
         route.MapDelete("/{id:int}", async (int id, AppDbContext context) =>
         {
             var fonte = await context.Fontes.FirstOrDefaultAsync(f => f.Id == id && f.Ativo);

@@ -4,11 +4,11 @@ namespace blogger_backend.Models
     {
         public int Id { get; set; }
 
-        // FK do usuário que salvou essa pesquisa
+     
         public int UsuarioId { get; set; }
         public UsuarioModel Usuario { get; set; } = null!;
 
-        // Preferências opcionais
+        
         public int? CategoriaId { get; set; }
         public CategoriaModel? Categoria { get; set; }
 

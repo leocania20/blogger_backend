@@ -56,13 +56,13 @@ public static class NotificacaoRoute
             return Results.Ok(notificacao);
         });
 
-        // DELETE (soft delete)
+        // DELETE 
         route.MapDelete("/{id:int}", async (int id, AppDbContext context) =>
         {
             var notificacao = await context.Notificacoes.FirstOrDefaultAsync(n => n.Id == id && n.Ativo);
             if (notificacao == null) return Results.NotFound();
 
-            notificacao.Ativo = false; // Soft delete
+            notificacao.Ativo = false; 
             await context.SaveChangesAsync();
             return Results.Ok();
         });

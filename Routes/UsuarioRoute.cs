@@ -12,7 +12,8 @@ public static class UsuarioRoute
     {
         var route = app.MapGroup("/usuario");
 
-        // === CRIAR USUÁRIO ===
+        // Get
+        // POST criar usuário
         route.MapPost("", async (UsuarioRequest req, AppDbContext context, IPasswordHasher<UsuarioModel> hasher) =>
         {
             if (await context.Usuarios.AnyAsync(u => u.Email == req.Email))
@@ -24,9 +25,11 @@ public static class UsuarioRoute
                 Email = req.Email,
                 Role = req.Role,
                 Ativo = true,
-                DataCadastro = DateTime.UtcNow,
-                SenhaHash = hasher.HashPassword(null!, req.Senha) // gera hash seguro
+                DataCadastro = DateTime.UtcNow
             };
+
+            // hash correto com a própria instância
+            usuario.SenhaHash = hasher.HashPassword(usuario, req.Senha);
 
             await context.Usuarios.AddAsync(usuario);
             await context.SaveChangesAsync();
@@ -41,7 +44,8 @@ public static class UsuarioRoute
             });
         });
 
-        // === LOGIN (JWT) ===
+
+        // Logar
         route.MapPost("/login", async (
             UsuarioLoginRequest req,
             AppDbContext context,
@@ -61,7 +65,7 @@ public static class UsuarioRoute
             return Results.Ok(new { Token = token, Usuario = usuario.Email, Role = usuario.Role });
         });
 
-        // === LISTAR USUÁRIOS ===
+        // Post
         route.MapGet("", async (AppDbContext context) =>
         {
             var usuarios = await context.Usuarios.ToListAsync();
@@ -70,7 +74,7 @@ public static class UsuarioRoute
             }));
         });
 
-        // === ATUALIZAR USUÁRIO ===
+        // Put
         route.MapPut("/{id:int}", async (int id, UsuarioRequest req, AppDbContext context, IPasswordHasher<UsuarioModel> hasher) =>
         {
             var usuario = await context.Usuarios.FirstOrDefaultAsync(u => u.Id == id);
@@ -81,7 +85,6 @@ public static class UsuarioRoute
             usuario.Role = req.Role;
             usuario.Ativo = true;
 
-            // se senha foi enviada, atualiza
             if (!string.IsNullOrWhiteSpace(req.Senha))
             {
                 usuario.SenhaHash = hasher.HashPassword(usuario, req.Senha);
@@ -99,7 +102,7 @@ public static class UsuarioRoute
             });
         });
 
-        // === SOFT DELETE ===
+        //Delete
         route.MapDelete("/{id:int}", async (int id, AppDbContext context) =>
         {
             var usuario = await context.Usuarios.FirstOrDefaultAsync(u => u.Id == id);
