@@ -7,18 +7,20 @@ namespace blogger_backend.Utils
 {
     public static class JwtTokenService
     {
-        public static string GenerateToken(string username, string role, string secretKey)
+        public static string GenerateToken(string username, string role, string secretKey, int usuarioId, string name)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.ASCII.GetBytes(secretKey);
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
-                Subject = new ClaimsIdentity(new[]
-                {
+                Subject = new ClaimsIdentity(
+                [
                     new Claim(ClaimTypes.Name, username),
-                    new Claim(ClaimTypes.Role, role)
-                }),
+                    new Claim(ClaimTypes.Role, role),
+                    new Claim("id", usuarioId.ToString()),
+                    new Claim ("name", name)
+                ]),
                 Expires = DateTime.UtcNow.AddHours(2),
                 SigningCredentials = new SigningCredentials(
                     new SymmetricSecurityKey(key),

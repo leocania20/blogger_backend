@@ -1,3 +1,4 @@
+using System.Numerics;
 using blogger_backend.Data;
 using blogger_backend.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -37,7 +38,6 @@ public static class ArtigoRoute
         // get
         route.MapGet("completo", async (
             int? id,
-            string? titulo,
             AppDbContext context) =>
         {
             var query = context.Artigos
@@ -49,9 +49,6 @@ public static class ArtigoRoute
 
             if (id.HasValue)
                 query = query.Where(a => a.Id == id.Value);
-
-            if (!string.IsNullOrWhiteSpace(titulo))
-                query = query.Where(a => a.Titulo.ToLower().Contains(titulo.ToLower()));
 
             var artigos = await query
                 .Select(a => new ArtigoResponse(
@@ -69,23 +66,25 @@ public static class ArtigoRoute
         });
 
         // get
-        route.MapGet("/paginaInicial", async (
-            int page,
-            AppDbContext context) =>
+        route.MapGet("/paginaInicial", async (int? page, AppDbContext context) =>
         {
             int pageSize = 6;
-            if (page < 1) page = 1;
+            int currentPage = page ?? 1; 
+            if (currentPage < 1) currentPage = 1;
 
-            var artigos = await context.Artigos
+            var query = context.Artigos
                 .Include(a => a.Categoria)
                 .Include(a => a.Autor)
                 .Include(a => a.Fonte)
-                .Where(a => a.IsPublicado)
+                .Where(a => a.IsPublicado);
+
+            var artigos = await query
                 .OrderByDescending(a => a.DataCriacao)
-                .Skip((page - 1) * pageSize)
+                .Skip((currentPage - 1) * pageSize)
                 .Take(pageSize)
                 .Select(a => new
                 {
+                    a.Id,
                     a.Titulo,
                     a.Imagem,
                     a.DataCriacao,
@@ -94,10 +93,14 @@ public static class ArtigoRoute
                 })
                 .ToListAsync();
 
+            var total = await query.CountAsync();
+
             return Results.Ok(new
             {
-                Pagina = page,
-                Total = await context.Artigos.CountAsync(a => a.IsPublicado),
+                Pagina = currentPage,
+                PageSize = pageSize,
+                Total = total,
+                TotalPaginas = (int)Math.Ceiling(total / (double)pageSize),
                 Artigos = artigos
             });
         });
@@ -135,16 +138,18 @@ public static class ArtigoRoute
         });
 
         // search
-        route.MapGet("/pesquisar", async (
+        route.MapGet("/pesquisar_geral", async (
             string? titulo,
             [FromQuery] int[]? categorias,
             [FromQuery] int[]? fontes,
             DateTime? data,
-            int page,
+            int? page,
             AppDbContext context) =>
         {
-            int pageSize = 3;
-            if (page < 1) page = 1;
+            int pageSize = 6;
+            int currentPage = page ?? 1;
+            
+            if (currentPage < 1) currentPage = 1;
 
             var query = context.Artigos
                 .Include(a => a.Categoria)
@@ -160,7 +165,7 @@ public static class ArtigoRoute
             {
                 return Results.Ok(await query
                     .OrderByDescending(a => a.DataCriacao)
-                    .Skip((page - 1) * pageSize)
+                    .Skip((currentPage - 1) * pageSize)
                     .Take(pageSize)
                     .Select(a => new
                     {
@@ -181,7 +186,7 @@ public static class ArtigoRoute
 
             var artigos = await query
                 .OrderByDescending(a => a.DataCriacao)
-                .Skip((page - 1) * pageSize)
+                .Skip((currentPage - 1) * pageSize)
                 .Take(pageSize)
                 .Select(a => new
                 {

@@ -3,6 +3,8 @@ using blogger_backend.Models;
 using blogger_backend.Data;
 using blogger_backend.Utils;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace blogger_backend.Routes;
 
@@ -12,8 +14,7 @@ public static class UsuarioRoute
     {
         var route = app.MapGroup("/usuario");
 
-        // Get
-        // POST criar usuário
+        // Post
         route.MapPost("", async (UsuarioRequest req, AppDbContext context, IPasswordHasher<UsuarioModel> hasher) =>
         {
             if (await context.Usuarios.AnyAsync(u => u.Email == req.Email))
@@ -28,7 +29,6 @@ public static class UsuarioRoute
                 DataCadastro = DateTime.UtcNow
             };
 
-            // hash correto com a própria instância
             usuario.SenhaHash = hasher.HashPassword(usuario, req.Senha);
 
             await context.Usuarios.AddAsync(usuario);
@@ -44,8 +44,7 @@ public static class UsuarioRoute
             });
         });
 
-
-        // Logar
+        // Login
         route.MapPost("/login", async (
             UsuarioLoginRequest req,
             AppDbContext context,
@@ -60,12 +59,28 @@ public static class UsuarioRoute
                 return Results.Unauthorized();
 
             string secretKey = config["Jwt:Key"] ?? "chave-secreta-superforte-com-32-caracteres!";
-            string token = JwtTokenService.GenerateToken(usuario.Email, usuario.Role, secretKey);
+            string token = JwtTokenService.GenerateToken(usuario.Email, usuario.Role, secretKey, usuario.Id, usuario.Nome);
 
-            return Results.Ok(new { Token = token, Usuario = usuario.Email, Role = usuario.Role, Id = usuario.Id, nome = usuario.Nome });
+            return Results.Ok(new { Token = $"Bearer {token}" });
         });
 
-        // Post
+        // Novo endpoint: pegar dados do usuário logado via Token
+        route.MapGet("/me", [Authorize] (HttpContext http) =>
+        {
+            var email = http.User.FindFirstValue(ClaimTypes.Name);
+            var role  = http.User.FindFirstValue(ClaimTypes.Role);
+            var id    = http.User.FindFirstValue("id");
+            var name  = http.User.FindFirstValue("name");
+
+            return Results.Ok(new
+            {
+                Id = id,
+                Email = email,
+                Role = role
+            });
+        });
+
+        // Listar usuários (apenas admin deveria usar isso)
         route.MapGet("", async (AppDbContext context) =>
         {
             var usuarios = await context.Usuarios.ToListAsync();
@@ -86,9 +101,7 @@ public static class UsuarioRoute
             usuario.Ativo = true;
 
             if (!string.IsNullOrWhiteSpace(req.Senha))
-            {
                 usuario.SenhaHash = hasher.HashPassword(usuario, req.Senha);
-            }
 
             await context.SaveChangesAsync();
 
@@ -102,7 +115,7 @@ public static class UsuarioRoute
             });
         });
 
-        //Delete
+        // Delete
         route.MapDelete("/{id:int}", async (int id, AppDbContext context) =>
         {
             var usuario = await context.Usuarios.FirstOrDefaultAsync(u => u.Id == id);
