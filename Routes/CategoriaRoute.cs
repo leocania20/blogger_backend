@@ -13,6 +13,14 @@ public static class CategoriaRoute
         // POST
         route.MapPost("", async (CategoriaRequest req, AppDbContext context) =>
         {
+             bool existe = await context.Categorias.AnyAsync(c =>
+                c.Ativo &&
+                (c.Nome.ToLower() == req.Nome.ToLower() ||
+                c.Slug.ToLower() == req.Slug.ToLower()));
+
+            if (existe)
+                return Results.BadRequest(new { Message = "Já existe uma categoria com este nome ou slug." });
+
             var categoria = new CategoriaModel
             {
                 Nome = req.Nome,
@@ -27,7 +35,7 @@ public static class CategoriaRoute
         });
 
         // GET
-        route.MapGet("", async (AppDbContext context) =>
+        route.MapGet("show", async (AppDbContext context) =>
         {
             var categorias = await context.Categorias
                                           .Where(c => c.Ativo)
@@ -40,6 +48,17 @@ public static class CategoriaRoute
         {
             var categoria = await context.Categorias.FirstOrDefaultAsync(c => c.Id == id && c.Ativo);
             if (categoria == null) return Results.NotFound();
+            
+
+            bool duplicado = await context.Categorias.AnyAsync(c =>
+                c.Id != id &&
+                c.Ativo &&
+                (c.Nome.ToLower() == req.Nome.ToLower() ||
+                c.Slug.ToLower() == req.Slug.ToLower()));
+
+            if (duplicado)
+                return Results.BadRequest(new { Message = "Já existe outra categoria com o mesmo nome ou slug." });
+
 
             categoria.Nome = req.Nome;
             categoria.Descricao = req.Descricao;

@@ -13,6 +13,14 @@ public static class FonteRoute
         // POST
         route.MapPost("", async (FonteRequest req, AppDbContext context) =>
         {
+            bool existe = await context.Fontes.AnyAsync(f =>
+                f.Ativo &&
+                (f.Nome.ToLower() == req.Nome.ToLower() ||
+                f.URL.ToLower() == req.URL.ToLower()));
+
+            if (existe)
+                return Results.BadRequest(new { Message = "Já existe uma fonte com este nome ou URL." });
+
             var fonte = new FonteModel
             {
                 Nome = req.Nome,
@@ -27,7 +35,7 @@ public static class FonteRoute
         });
 
         // GET
-        route.MapGet("", async (AppDbContext context) =>
+        route.MapGet("show", async (AppDbContext context) =>
         {
             var fontes = await context.Fontes
                                       .Where(f => f.Ativo)
@@ -40,6 +48,15 @@ public static class FonteRoute
         {
             var fonte = await context.Fontes.FirstOrDefaultAsync(f => f.Id == id && f.Ativo);
             if (fonte == null) return Results.NotFound();
+            
+            bool duplicado = await context.Fontes.AnyAsync(f =>
+                f.Id != id &&
+                f.Ativo &&
+                (f.Nome.ToLower() == req.Nome.ToLower() ||
+                f.URL.ToLower() == req.URL.ToLower()));
+
+            if (duplicado)
+                return Results.BadRequest(new { Message = "Já existe outra fonte com o mesmo nome ou URL." });
 
             fonte.Nome = req.Nome;
             fonte.URL = req.URL;

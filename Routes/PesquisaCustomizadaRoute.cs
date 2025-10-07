@@ -10,8 +10,8 @@ public static class PesquisaCustomizadaRoute
     {
         var route = app.MapGroup("/pesquisa").RequireAuthorization();
 
-        // POST - criar preferência
-        route.MapPost("para_escolher", async (PesquisaCustomizadaRequest req, AppDbContext context, HttpContext http) =>
+        // POST
+        route.MapPost("setings", async (PesquisaCustomizadaRequest req, AppDbContext context, HttpContext http) =>
         {
             var userId = http.User.FindFirst("id")?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -27,7 +27,7 @@ public static class PesquisaCustomizadaRoute
             );
 
             if (jaExiste)
-                return Results.BadRequest(new { Message = "Essa preferência já existe." });
+                return Results.BadRequest(new { Message = "Essa combinação de categoria, autor e fonte já foi salva para este usuário." });
 
             var pesquisa = new PesquisaCustomizadaModel
             {
@@ -38,10 +38,25 @@ public static class PesquisaCustomizadaRoute
                 DataCriacao = DateTime.UtcNow
             };
 
-            await context.PesquisasCustomizadas.AddAsync(pesquisa);
-            await context.SaveChangesAsync();
+            try
+            {
+                await context.PesquisasCustomizadas.AddAsync(pesquisa);
+                await context.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                return Results.BadRequest(new { Message = "Registro duplicado detectado. Essa preferência já existe." });
+            }
 
-            return Results.Created($"/pesquisa/{pesquisa.Id}", pesquisa);
+            return Results.Created($"/pesquisa/{pesquisa.Id}", new
+            {
+                pesquisa.Id,
+                pesquisa.UsuarioId,
+                pesquisa.CategoriaId,
+                pesquisa.AutorId,
+                pesquisa.FonteId,
+                pesquisa.DataCriacao
+            });
         });
 
         // GET - listar todas as preferências do usuário logado
@@ -90,7 +105,7 @@ public static class PesquisaCustomizadaRoute
              return Results.Ok(result);
          });
 
-        // DELETE - deletar preferência por categoria, autor ou fonte
+        // DELETE 
         route.MapDelete("deletar_preferencia", async ([FromQuery] int? categoriaId, [FromQuery] int? autorId, [FromQuery] int? fonteId, HttpContext http, AppDbContext context) =>
         {
             var userId = http.User.FindFirstValue("id");

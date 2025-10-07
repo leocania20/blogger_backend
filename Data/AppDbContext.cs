@@ -23,12 +23,37 @@ namespace blogger_backend.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // Índice único para email do usuário
             modelBuilder.Entity<UsuarioModel>()
                         .HasIndex(u => u.Email)
                         .IsUnique();
+            
+            modelBuilder.Entity<UsuarioModel>()
+            .HasIndex(u => u.Nome)
+            .IsUnique();
+            
+            modelBuilder.Entity<AutorModel>()
+                .HasIndex(a => a.Email)
+                .IsUnique();
 
-            // Relacionamentos
+            modelBuilder.Entity<AutorModel>()
+                .HasIndex(a => a.Nome)
+                .IsUnique();
+
+            modelBuilder.Entity<CategoriaModel>()
+                .HasIndex(c => c.Slug)
+                .IsUnique();
+
+            modelBuilder.Entity<CategoriaModel>()
+                .HasIndex(c => c.Nome)
+                .IsUnique();
+
+            modelBuilder.Entity<FonteModel>()
+                .HasIndex(f => f.Nome)
+                .IsUnique();
+
+            modelBuilder.Entity<FonteModel>()
+                .HasIndex(f => f.URL)
+                .IsUnique();
             modelBuilder.Entity<ArtigoModel>()
                         .HasOne(a => a.Categoria)
                         .WithMany(c => c.Artigos)
@@ -65,7 +90,11 @@ namespace blogger_backend.Data
                         .WithMany(a => a.Notificacoes)
                         .HasForeignKey(n => n.ArtigoId)
                         .IsRequired(false);
-                        
+            
+            modelBuilder.Entity<PesquisaCustomizadaModel>()
+                        .HasIndex(p => new { p.UsuarioId, p.CategoriaId, p.AutorId, p.FonteId })
+                        .IsUnique();
+                                        
             modelBuilder.Entity<PesquisaCustomizadaModel>()
                 .HasOne(p => p.Usuario)
                 .WithMany(u => u.PesquisasCustomizadas)
