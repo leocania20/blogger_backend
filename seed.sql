@@ -1,71 +1,79 @@
--- ============================
--- RESETAR DADOS (opcional, só se precisa começar limpo)
--- ============================
-DELETE FROM PesquisasCustomizadas;
-DELETE FROM Artigos;
-DELETE FROM Autores;
-DELETE FROM Fontes;
-DELETE FROM Categorias;
-DELETE FROM Usuarios;
-
--- ============================
--- POPULAR USUÁRIOS
--- ============================
-INSERT INTO Usuarios (Nome, Email, SenhaHash, Role, Ativo, DataCadastro) VALUES
-('Admin', 'admin@email.com', '123456', 'Admin', 1, CURRENT_TIMESTAMP),
-('João Silva', 'joao.user@email.com', '123456', 'User', 1, CURRENT_TIMESTAMP),
-('Maria Oliveira', 'maria.user@email.com', '123456', 'User', 1, CURRENT_TIMESTAMP),
-('Carlos Mendes', 'carlos.user@email.com', '123456', 'User', 1, CURRENT_TIMESTAMP),
-('Ana Costa', 'ana.user@email.com', '123456', 'User', 1, CURRENT_TIMESTAMP);
+BEGIN;
 
 -- ============================
 -- POPULAR CATEGORIAS
 -- ============================
-INSERT INTO Categorias (Nome, Slug, Descricao, Ativo) VALUES
-('Tecnologia', 'tecnologia', 'Notícias sobre tecnologia e inovação', 1),
-('Educação', 'educacao', 'Artigos voltados à área da educação', 1),
-('Ciência', 'ciencia', 'Descobertas e avanços científicos', 1),
-('Esportes', 'esportes', 'Esportes nacionais e internacionais', 1),
-('Saúde', 'saude', 'Notícias sobre saúde e bem-estar', 1);
+INSERT INTO "Categorias" ("Nome", "Descricao", "Slug", "Ativo") VALUES
+('Tecnologia', 'Notícias sobre tecnologia e inovação', 'tecnologia', TRUE),
+('Educação', 'Artigos voltados à área da educação', 'educacao', TRUE),
+('Ciência', 'Descobertas e avanços científicos', 'ciencia', TRUE),
+('Esportes', 'Esportes nacionais e internacionais', 'esportes', TRUE),
+('Saúde', 'Notícias sobre saúde e bem-estar', 'saude', TRUE);
 
 -- ============================
 -- POPULAR FONTES
 -- ============================
-INSERT INTO Fontes (Nome, URL, Tipo, Ativo) VALUES
-('Agência Angola Press', 'https://www.angop.ao', 'Agência', 1),
-('BBC', 'https://www.bbc.com', 'Externa', 1),
-('CNN', 'https://www.cnn.com', 'Internacional', 1),
-('The Guardian', 'https://www.theguardian.com', 'Externa', 1),
-('DW África', 'https://www.dw.com', 'Internacional', 1);
+INSERT INTO "Fontes" ("Nome", "URL", "Tipo", "Ativo") VALUES
+('Agência Angola Press', 'https://www.angop.ao', 'Agência', TRUE),
+('BBC', 'https://www.bbc.com', 'Externa', TRUE),
+('CNN', 'https://www.cnn.com', 'Internacional', TRUE),
+('The Guardian', 'https://www.theguardian.com', 'Externa', TRUE),
+('DW África', 'https://www.dw.com', 'Internacional', TRUE);
 
 -- ============================
 -- POPULAR AUTORES
 -- ============================
-INSERT INTO Autores (Nome, Email, Bio, Ativo) VALUES
-('João Silva', 'autor.joao@email.com', 'Jornalista especializado em tecnologia.', 1),
-('Maria Oliveira', 'autor.maria@email.com', 'Pesquisadora na área de educação.', 1),
-('Carlos Mendes', 'autor.carlos@email.com', 'Divulgador científico e palestrante.', 1),
-('Ana Costa', 'autor.ana@email.com', 'Escritora na área de saúde.', 1),
-('Pedro Gomes', 'autor.pedro@email.com', 'Repórter esportivo.', 1);
+INSERT INTO "Autores" ("Nome", "Email", "Bio", "Ativo") VALUES
+('João Silva', 'autor.joao@email.com', 'Jornalista especializado em tecnologia.', TRUE),
+('Maria Oliveira', 'autor.maria@email.com', 'Pesquisadora na área de educação.', TRUE),
+('Carlos Mendes', 'autor.carlos@email.com', 'Divulgador científico e palestrante.', TRUE),
+('Ana Costa', 'autor.ana@email.com', 'Escritora na área de saúde.', TRUE),
+('Pedro Gomes', 'autor.pedro@email.com', 'Repórter esportivo.', TRUE);
 
 -- ============================
--- POPULAR ARTIGOS
+-- POPULAR ARTIGOS (10)
 -- ============================
-INSERT INTO Artigos 
-(Titulo, Slug, Conteudo, Resumo, CategoriaId, AutorId, FonteId, IsPublicado, DataCriacao) VALUES
-('Primeiro Artigo', 'primeiro-artigo', 'Conteúdo sobre inovação tecnológica.', 'Resumo do artigo 1', 1, 1, 1, 1, CURRENT_TIMESTAMP),
-('Educação no Século XXI', 'educacao-seculo-xxi', 'Discussão sobre métodos educacionais modernos.', 'Resumo do artigo 2', 2, 2, 2, 1, CURRENT_TIMESTAMP),
-('Ciência Moderna', 'ciencia-moderna', 'Texto sobre avanços científicos.', 'Resumo do artigo 3', 3, 3, 3, 1, CURRENT_TIMESTAMP),
-('Esportes em Angola', 'esportes-angola', 'Cobertura esportiva nacional.', 'Resumo do artigo 4', 4, 5, 4, 1, CURRENT_TIMESTAMP),
-('Saúde Pública', 'saude-publica', 'Análise da saúde em Angola.', 'Resumo do artigo 5', 5, 4, 5, 1, CURRENT_TIMESTAMP);
+INSERT INTO "Artigos" 
+("Titulo", "Slug", "Conteudo", "Resumo", "CategoriaId", "AutorId", "FonteId", "IsPublicado", "DataCriacao", "Imagem") VALUES
+('The Ultimate Guide to Bali: What to See, Do, and Eat', 'ultimate-guide-bali',
+'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout...',
+'Descubra o melhor de Bali: praias, templos, e gastronomia incrível.', 1, 1, 1, TRUE, CURRENT_TIMESTAMP, '/uploads/artigos/Gemini_Generated_Image_ep4zydep4zydep4z.png'),
+('Explorando o Futuro da Tecnologia', 'futuro-da-tecnologia',
+'It is a long established fact that a reader will be distracted by the readable content...',
+'Como a IA e a robótica estão moldando o futuro.', 1, 1, 2, TRUE, CURRENT_TIMESTAMP, '/uploads/artigos/Gemini_Generated_Image_ep4zydep4zydep4z.png'),
+('Métodos Educacionais do Século XXI', 'metodos-educacionais-seculo-xxi',
+'It is a long established fact that a reader will be distracted by the readable content...',
+'Uma análise das novas tendências na educação.', 2, 2, 2, TRUE, CURRENT_TIMESTAMP, '/uploads/artigos/Gemini_Generated_Image_ep4zydep4zydep4z.png'),
+('Descobertas Científicas Recentes', 'descobertas-cientificas',
+'It is a long established fact that a reader will be distracted by the readable content...',
+'Os mais recentes avanços no mundo da ciência.', 3, 3, 3, TRUE, CURRENT_TIMESTAMP, '/uploads/artigos/Gemini_Generated_Image_ep4zydep4zydep4z.png'),
+('Saúde e Bem-Estar em Foco', 'saude-e-bem-estar',
+'It is a long established fact that a reader will be distracted by the readable content...',
+'Cuidados e práticas para uma vida saudável.', 5, 4, 5, TRUE, CURRENT_TIMESTAMP, '/uploads/artigos/Gemini_Generated_Image_ep4zydep4zydep4z.png'),
+('Os Desafios do Jornalismo Digital', 'jornalismo-digital',
+'It is a long established fact that a reader will be distracted by the readable content...',
+'Como o jornalismo se adapta à era da informação.', 1, 1, 2, TRUE, CURRENT_TIMESTAMP, '/uploads/artigos/Gemini_Generated_Image_ep4zydep4zydep4z.png'),
+('Educação Inclusiva no Século XXI', 'educacao-inclusiva',
+'It is a long established fact that a reader will be distracted by the readable content...',
+'Um olhar sobre a importância da inclusão nas escolas.', 2, 2, 2, TRUE, CURRENT_TIMESTAMP, '/uploads/artigos/Gemini_Generated_Image_ep4zydep4zydep4z.png'),
+('Explorando o Universo', 'explorando-o-universo',
+'It is a long established fact that a reader will be distracted by the readable content...',
+'Uma viagem pelas galáxias e novas descobertas.', 3, 3, 3, TRUE, CURRENT_TIMESTAMP, '/uploads/artigos/Gemini_Generated_Image_ep4zydep4zydep4z.png'),
+('Esportes e Motivação', 'esportes-e-motivacao',
+'It is a long established fact that a reader will be distracted by the readable content...',
+'A influência do esporte na saúde mental.', 4, 5, 4, TRUE, CURRENT_TIMESTAMP, '/uploads/artigos/Gemini_Generated_Image_ep4zydep4zydep4z.png'),
+('A Importância da Alimentação Saudável', 'alimentacao-saudavel',
+'It is a long established fact that a reader will be distracted by the readable content...',
+'Como a alimentação afeta o corpo e a mente.', 5, 4, 5, TRUE, CURRENT_TIMESTAMP, '/uploads/artigos/Gemini_Generated_Image_ep4zydep4zydep4z.png');
 
 -- ============================
--- POPULAR PESQUISA CUSTOMIZADA
--- Cada usuário escolhe preferências de Categoria, Autor e Fonte
+-- POPULAR PESQUISAS CUSTOMIZADAS
 -- ============================
-INSERT INTO PesquisasCustomizadas (UsuarioId, CategoriaId, AutorId, FonteId, DataCriacao) VALUES
-(2, 1, 1, 1, CURRENT_TIMESTAMP), -- João Silva gosta de tecnologia, autor João Silva, fonte Angop
-(2, 3, 3, 3, CURRENT_TIMESTAMP), -- João também segue ciência (Carlos Mendes, CNN)
-(3, 2, 2, 2, CURRENT_TIMESTAMP), -- Maria prefere educação, autora Maria, fonte BBC
-(4, 5, 4, 5, CURRENT_TIMESTAMP), -- Carlos segue saúde (Ana Costa, DW África)
-(5, 4, 5, 4, CURRENT_TIMESTAMP); -- Ana gosta de esportes (Pedro Gomes, The Guardian)
+INSERT INTO "PesquisasCustomizadas" ("UsuarioId", "CategoriaId", "AutorId", "FonteId", "DataCriacao") VALUES
+(1, 1, 1, 1, CURRENT_TIMESTAMP),
+(1, 3, 3, 3, CURRENT_TIMESTAMP),
+(1, 2, 2, 2, CURRENT_TIMESTAMP),
+(1, 5, 4, 5, CURRENT_TIMESTAMP),
+(1, 4, 5, 4, CURRENT_TIMESTAMP);
+
+COMMIT;

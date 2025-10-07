@@ -13,6 +13,14 @@ public static class AutorRoute
         // POST
         route.MapPost("", async (AutorRequest req, AppDbContext context) =>
         {
+             bool existe = await context.Autores.AnyAsync(a =>
+                a.Ativo &&
+                (a.Email.ToLower() == req.Email.ToLower() ||
+                a.Nome.ToLower() == req.Nome.ToLower()));
+
+            if (existe)
+                return Results.BadRequest(new { Message = "Já existe um autor com este nome ou e-mail." });
+
             var autor = new AutorModel
             {
                 Nome = req.Nome,
@@ -28,7 +36,7 @@ public static class AutorRoute
         });
 
         // GET
-        route.MapGet("", async (AppDbContext context) =>
+        route.MapGet("show", async (AppDbContext context) =>
         {
             var autores = await context.Autores
                                       .Where(a => a.Ativo)
@@ -41,6 +49,15 @@ public static class AutorRoute
         {
             var autor = await context.Autores.FirstOrDefaultAsync(a => a.Id == id && a.Ativo);
             if (autor == null) return Results.NotFound();
+
+            bool duplicado = await context.Autores.AnyAsync(a =>
+                a.Id != id &&
+                a.Ativo &&
+                (a.Email.ToLower() == req.Email.ToLower() ||
+                a.Nome.ToLower() == req.Nome.ToLower()));
+
+            if (duplicado)
+                return Results.BadRequest(new { Message = "Outro autor com o mesmo nome ou e-mail já existe." });
 
             autor.Nome = req.Nome;
             autor.Bio = req.Bio;

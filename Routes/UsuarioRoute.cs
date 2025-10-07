@@ -15,10 +15,13 @@ public static class UsuarioRoute
         var route = app.MapGroup("/usuario");
 
         // Post
-        route.MapPost("", async (UsuarioRequest req, AppDbContext context, IPasswordHasher<UsuarioModel> hasher) =>
+        route.MapPost("/signup", async (UsuarioRequest req, AppDbContext context, IPasswordHasher<UsuarioModel> hasher) =>
         {
-            if (await context.Usuarios.AnyAsync(u => u.Email == req.Email))
+             if (await context.Usuarios.AnyAsync(u => u.Email == req.Email))
                 return Results.BadRequest(new { Error = "Já existe um usuário com este e-mail." });
+
+            if (await context.Usuarios.AnyAsync(u => u.Nome == req.Nome))
+                return Results.BadRequest(new { Error = "Já existe um usuário com este nome." });
 
             var usuario = new UsuarioModel
             {
@@ -45,7 +48,7 @@ public static class UsuarioRoute
         });
 
         // Login
-        route.MapPost("/login", async (
+        route.MapPost("/signin", async (
             UsuarioLoginRequest req,
             AppDbContext context,
             IPasswordHasher<UsuarioModel> hasher) =>
@@ -65,7 +68,7 @@ public static class UsuarioRoute
         });
 
         // Novo endpoint: pegar dados do usuário logado via Token
-        route.MapGet("/me", [Authorize] (HttpContext http) =>
+        route.MapGet("/getdata", [Authorize] (HttpContext http) =>
         {
             var email = http.User.FindFirstValue(ClaimTypes.Name);
             var role  = http.User.FindFirstValue(ClaimTypes.Role);
@@ -74,14 +77,13 @@ public static class UsuarioRoute
 
             return Results.Ok(new
             {
-                Id = id,
                 Email = email,
-                Role = role
+                Nome=name
             });
         });
 
         // Listar usuários (apenas admin deveria usar isso)
-        route.MapGet("", async (AppDbContext context) =>
+        route.MapGet("show", async (AppDbContext context) =>
         {
             var usuarios = await context.Usuarios.ToListAsync();
             return Results.Ok(usuarios.Select(u => new {
@@ -90,10 +92,18 @@ public static class UsuarioRoute
         });
 
         // Put
-        route.MapPut("/{id:int}", async (int id, UsuarioRequest req, AppDbContext context, IPasswordHasher<UsuarioModel> hasher) =>
+        route.MapPut("/{id:int}updatelogin", async (int id, UsuarioRequest req, AppDbContext context, IPasswordHasher<UsuarioModel> hasher) =>
         {
             var usuario = await context.Usuarios.FirstOrDefaultAsync(u => u.Id == id);
             if (usuario == null) return Results.NotFound();
+
+            
+            if (await context.Usuarios.AnyAsync(u => u.Email == req.Email && u.Id != id))
+                return Results.BadRequest(new { Error = "Já existe outro usuário com este e-mail." });
+
+            
+            if (await context.Usuarios.AnyAsync(u => u.Nome == req.Nome && u.Id != id))
+                return Results.BadRequest(new { Error = "Já existe outro usuário com este nome." });
 
             usuario.Nome = req.Nome;
             usuario.Email = req.Email;
@@ -116,7 +126,7 @@ public static class UsuarioRoute
         });
 
         // Delete
-        route.MapDelete("/{id:int}", async (int id, AppDbContext context) =>
+        route.MapDelete("/{id:int}delete", async (int id, AppDbContext context) =>
         {
             var usuario = await context.Usuarios.FirstOrDefaultAsync(u => u.Id == id);
             if (usuario == null) return Results.NotFound();
