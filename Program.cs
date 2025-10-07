@@ -12,6 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
 
+// Configuração do Swagger/OpenAPI (Correto, sem alterações)
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Blogger API", Version = "v1" });
@@ -42,12 +43,41 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// ************************************************
+// CORREÇÃO APLICADA AQUI PARA ROBUSTEZ DA CONEXÃO
+// ************************************************
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+if (!string.IsNullOrEmpty(connectionString) && connectionString.StartsWith("postgresql://"))
+{
+    // O Render geralmente fornece a string em formato URL (postgresql://...)
+    // O Npgsql pode interpretar a URL, mas precisamos garantir o Ssl Mode=Require
+    
+    // Converte a URL para URI para extrair componentes
+    var uri = new Uri(connectionString);
+    var db = uri.AbsolutePath.Trim('/');
+    var userInfo = uri.UserInfo.Split(':');
+    var user = userInfo[0];
+    var password = userInfo.Length > 1 ? userInfo[1] : string.Empty;
+
+    // Recria a string no formato Key=Value para maior compatibilidade e força SSL
+    connectionString = $"Host={uri.Host};Port={uri.Port};Database={db};Username={user};Password={password};Ssl Mode=Require;Trust Server Certificate=true";
+}
+// Se já estiver em Key=Value, garante que tenha Ssl Mode
+else if (!string.IsNullOrEmpty(connectionString) && !connectionString.Contains("Ssl Mode="))
+{
+    connectionString += ";Ssl Mode=Require;Trust Server Certificate=true";
+}
+
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+    options.UseNpgsql(connectionString)
 );
+// ************************************************
 
 builder.Services.AddScoped<IPasswordHasher<UsuarioModel>, PasswordHasher<UsuarioModel>>();
 
+// Configuração de CORS (Correto, sem alterações)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll",
@@ -56,6 +86,7 @@ builder.Services.AddCors(options =>
                         .AllowAnyHeader());
 });
 
+// Configuração de JWT (Correto, sem alterações)
 var key = builder.Configuration["Jwt:Key"] ?? "chave-secreta-superforte";
 builder.Services.AddAuthentication(options =>
 {
@@ -72,7 +103,8 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = false,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(key))
+        // Usando Encoding.UTF8 para maior compatibilidade (melhor prática)
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)) 
     };
 });
 
@@ -80,6 +112,7 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+// Middlewares (Corretos, sem alterações)
 app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
@@ -87,18 +120,20 @@ app.UseSwaggerUI(options =>
     options.RoutePrefix = string.Empty;
 });
 
+// Aplicação de Migrações (Correta, sem alterações)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
+    // Esta linha pode causar falha se a string de conexão estiver errada
+    db.Database.Migrate(); 
 }
-
 
 app.UseCors("AllowAll"); 
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseStaticFiles(); 
 
+// Mapeamento de Rotas (Correto, sem alterações)
 app.UsuarioRoutes(builder.Configuration);
 app.ArtigoRoutes();
 app.AutorRoutes();
