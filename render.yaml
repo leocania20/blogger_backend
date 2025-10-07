@@ -1,8 +1,9 @@
 services:
   - type: web
     name: blogger-backend
-    env: docker
-    plan: free
-    autoDeploy: true
-    buildCommand: "dotnet publish -c Release -o out"
-    startCommand: "dotnet out/blogger_backend.dll"
+    env: dotnet
+    buildCommand: dotnet publish -c Release -o out
+    startCommand: dotnet out/blogger_backend.dll
+    envVars:
+      - key: DATABASE_URL
+        value: postgresql://blogger_bd_user:a4vwGITbMV2c33DrQc39A7eHpxLmLIQn@dpg-d3i66hc9c44c73agvmng-a.oregon-postgres.render.com/blogger_bd
