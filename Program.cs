@@ -43,25 +43,27 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // Detecta e converte a DATABASE_URL do Render automaticamente
-// === CONFIGURAÇÃO DO BANCO DE DADOS ===
+// 🔧 Lê e converte a variável DATABASE_URL do Render (se existir)
 var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
-
 string connectionString;
 
 if (!string.IsNullOrEmpty(databaseUrl))
 {
-    // Render usa "postgresql://" -> converter para formato aceito pelo Npgsql
-    var uri = new Uri(databaseUrl.Replace("postgresql://", "postgres://"));
+    var uri = new Uri(databaseUrl);
     var userInfo = uri.UserInfo.Split(':');
 
-    connectionString = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true";
-    Console.WriteLine($"[INFO] Conectando ao PostgreSQL no Render: {uri.Host}");
+    // ⚙️ Força a porta 5432 caso a URL não a inclua
+    var port = uri.Port > 0 ? uri.Port : 5432;
+
+    connectionString =
+        $"Host={uri.Host};Port={port};Username={userInfo[0]};Password={userInfo[1]};Database={uri.AbsolutePath.TrimStart('/')};SSL Mode=Require;Trust Server Certificate=true";
+
+    Console.WriteLine($"[INFO] Conectando ao PostgreSQL no Render: {uri.Host}:{port}");
 }
 else
 {
-    // Fallback local (SQLite, por exemplo)
-    connectionString = "Data Source=blogger.db";
-    Console.WriteLine("[INFO] Usando banco de dados local SQLite");
+    connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    Console.WriteLine("[INFO] Usando connection string local.");
 }
 
 builder.Services.AddDbContext<AppDbContext>(options =>
