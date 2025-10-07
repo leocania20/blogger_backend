@@ -43,28 +43,31 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // Detecta e converte a DATABASE_URL do Render automaticamente
+// === CONFIGURAÇÃO DO BANCO DE DADOS ===
 var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
 
 string connectionString;
 
 if (!string.IsNullOrEmpty(databaseUrl))
 {
-    // Render usa "postgresql://", então vamos converter
-    var uri = new Uri(databaseUrl.Replace("postgresql://", "postgres://")); // garante formato padrão
+    // Render usa "postgresql://" -> converter para formato aceito pelo Npgsql
+    var uri = new Uri(databaseUrl.Replace("postgresql://", "postgres://"));
     var userInfo = uri.UserInfo.Split(':');
 
     connectionString = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true";
+    Console.WriteLine($"[INFO] Conectando ao PostgreSQL no Render: {uri.Host}");
 }
 else
 {
-    // fallback local - usa a connection string do appsettings.json
-    connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ??
-                       "Host=localhost;Database=blogger_bd;Username=postgres;Password=12345";
+    // Fallback local (SQLite, por exemplo)
+    connectionString = "Data Source=blogger.db";
+    Console.WriteLine("[INFO] Usando banco de dados local SQLite");
 }
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString)
 );
+
 
 
 builder.Services.AddScoped<IPasswordHasher<UsuarioModel>, PasswordHasher<UsuarioModel>>();
