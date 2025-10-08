@@ -69,7 +69,7 @@ public static class ArtigoRoute
         route.MapGet("/paginaInicial", async (int? page, AppDbContext context) =>
         {
             int pageSize = 6;
-            int currentPage = page ?? 1; 
+            int currentPage = page ?? 1;
             if (currentPage < 1) currentPage = 1;
 
             var query = context.Artigos
@@ -78,20 +78,31 @@ public static class ArtigoRoute
                 .Include(a => a.Fonte)
                 .Where(a => a.IsPublicado);
 
-            var artigos = await query
+            var artigosBase = await query
                 .OrderByDescending(a => a.DataCriacao)
                 .Skip((currentPage - 1) * pageSize)
                 .Take(pageSize)
-                .Select(a => new
-                {
-                    a.Id,
-                    a.Titulo,
-                    a.Imagem,
-                    a.DataCriacao,
-                    Autor = a.Autor.Nome,
-                    a.Resumo
-                })
                 .ToListAsync();
+
+            var verificationFonte = new blogger_backend.Utils.VerificationFonte(context);
+
+            var artigos = new List<object>();
+
+            foreach (var artigo in artigosBase)
+            {
+                var urlFonte = await verificationFonte.ObterUrlFontePorArtigoAsync(artigo.Id) ?? "";
+
+                artigos.Add(new
+                {
+                    artigo.Id,
+                    artigo.Titulo,
+                    artigo.Imagem,
+                    artigo.DataCriacao,
+                    Autor = artigo.Autor.Nome,
+                    artigo.Resumo,
+                    UrlFonte = urlFonte 
+                });
+            }
 
             var total = await query.CountAsync();
 
@@ -206,8 +217,8 @@ public static class ArtigoRoute
             });
         });
 
-        // uplload img 
-        route.MapPost("/upload-imagem", async (HttpRequest request) =>
+        // upload img 
+        route.MapPost("/upload-imagem", async (HttpRequest request, IConfiguration config) =>
         {
             var form = await request.ReadFormAsync();
             var file = form.Files.FirstOrDefault();
@@ -227,7 +238,14 @@ public static class ArtigoRoute
                 await file.CopyToAsync(stream);
             }
 
-            var url = $"/uploads/artigos/{fileName}";
+
+            var baseUrl = config.GetValue<string>("BackendSettings:BaseUrl");
+
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                return Results.Ok(new { Url = $"/uploads/artigos/{fileName}" }); 
+            }
+            var url = $"{baseUrl.TrimEnd('/')}/uploads/artigos/{fileName}";
             return Results.Ok(new { Url = url });
         });
     }
