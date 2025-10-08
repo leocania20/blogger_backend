@@ -42,8 +42,7 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Detecta e converte a DATABASE_URL do Render automaticamente
-// 🔧 Lê e converte a variável DATABASE_URL do Render (se existir)
+
 var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
 string connectionString;
 
@@ -51,8 +50,6 @@ if (!string.IsNullOrEmpty(databaseUrl))
 {
     var uri = new Uri(databaseUrl);
     var userInfo = uri.UserInfo.Split(':');
-
-    // ⚙️ Força a porta 5432 caso a URL não a inclua
     var port = uri.Port > 0 ? uri.Port : 5432;
 
     connectionString =
@@ -62,9 +59,13 @@ if (!string.IsNullOrEmpty(databaseUrl))
 }
 else
 {
-    connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+                       ?? throw new InvalidOperationException("Connection string 'DefaultConnection' não foi encontrada.");
+
     Console.WriteLine("[INFO] Usando connection string local.");
 }
+
+
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString)
