@@ -73,7 +73,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 
 
-builder.Services.AddScoped<IPasswordHasher<UsuarioModel>, PasswordHasher<UsuarioModel>>();
+builder.Services.AddScoped<IPasswordHasher<UserModel>, PasswordHasher<UserModel>>();
 
 builder.Services.AddCors(options =>
 {
@@ -126,14 +126,14 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseStaticFiles(); 
 
-app.UsuarioRoutes(builder.Configuration);
-app.ArtigoRoutes();
-app.AutorRoutes();
-app.CategoriaRoutes();
-app.FonteRoutes();
-app.ComentarioRoutes();
+app.UserRoutes(builder.Configuration);
+app.ArticlesRoutes();
+app.AuthorRoutes();
+app.CategoryRoutes();
+app.SourceRoute();
+app.CommentRoutes();
 app.NewsletterRoutes();
-app.NotificacaoRoutes();
+app.NotificationRoutes();
 app.PesquisaCustomizadaRoutes();
 
 app.Run();

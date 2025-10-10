@@ -4,7 +4,7 @@ namespace blogger_backend.Models
     {
         public int Id { get; set; }
         public string Email { get; set; } = null!;
-        public DateTime DataCadastro { get; set; } = DateTime.UtcNow;
-        public bool Ativo { get; set; } = true;
+        public DateTime CreateDate { get; set; } = DateTime.UtcNow;
+        public bool Active { get; set; } = true;
     }
 }

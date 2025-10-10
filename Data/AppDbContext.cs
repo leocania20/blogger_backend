@@ -9,113 +9,113 @@ namespace blogger_backend.Data
         {
         }
 
-        public DbSet<UsuarioModel> Usuarios { get; set; } = null!;
-        public DbSet<AutorModel> Autores { get; set; } = null!;
-        public DbSet<CategoriaModel> Categorias { get; set; } = null!;
-        public DbSet<FonteModel> Fontes { get; set; } = null!;
-        public DbSet<ArtigoModel> Artigos { get; set; } = null!;
-        public DbSet<ComentarioModel> Comentarios { get; set; } = null!;
+        public DbSet<UserModel> Users { get; set; } = null!;
+        public DbSet<AuthorModel> Authores { get; set; } = null!;
+        public DbSet<CategoryModel> Categories { get; set; } = null!;
+        public DbSet<SourceModel> Sources { get; set; } = null!;
+        public DbSet<ArticlesModel> Articles { get; set; } = null!;
+        public DbSet<CommentModel> Comments { get; set; } = null!;
         public DbSet<NewsletterModel> Newsletters { get; set; } = null!;
-        public DbSet<NotificacaoModel> Notificacoes { get; set; } = null!;
-        public DbSet<PesquisaCustomizadaModel> PesquisasCustomizadas { get; set; } = null!;
+        public DbSet<NotificationModel> Notifications { get; set; } = null!;
+        public DbSet<CustomizedResearchModel> CustomizedResearches { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
-            modelBuilder.Entity<UsuarioModel>()
+            modelBuilder.Entity<UserModel>()
                         .HasIndex(u => u.Email)
                         .IsUnique();
             
-            modelBuilder.Entity<UsuarioModel>()
-            .HasIndex(u => u.Nome)
+            modelBuilder.Entity<UserModel>()
+            .HasIndex(u => u.Name)
             .IsUnique();
             
-            modelBuilder.Entity<AutorModel>()
+            modelBuilder.Entity<AuthorModel>()
                 .HasIndex(a => a.Email)
                 .IsUnique();
 
-            modelBuilder.Entity<AutorModel>()
-                .HasIndex(a => a.Nome)
+            modelBuilder.Entity<AuthorModel>()
+                .HasIndex(a => a.Name)
                 .IsUnique();
 
-            modelBuilder.Entity<CategoriaModel>()
-                .HasIndex(c => c.Slug)
+            modelBuilder.Entity<CategoryModel>()
+                .HasIndex(c => c.Tag)
                 .IsUnique();
 
-            modelBuilder.Entity<CategoriaModel>()
-                .HasIndex(c => c.Nome)
+            modelBuilder.Entity<CategoryModel>()
+                .HasIndex(c => c.Name)
                 .IsUnique();
 
-            modelBuilder.Entity<FonteModel>()
-                .HasIndex(f => f.Nome)
+            modelBuilder.Entity<SourceModel>()
+                .HasIndex(f => f.Name)
                 .IsUnique();
 
-            modelBuilder.Entity<FonteModel>()
+            modelBuilder.Entity<SourceModel>()
                 .HasIndex(f => f.URL)
                 .IsUnique();
-            modelBuilder.Entity<ArtigoModel>()
-                        .HasOne(a => a.Categoria)
-                        .WithMany(c => c.Artigos)
-                        .HasForeignKey(a => a.CategoriaId);
+            modelBuilder.Entity<ArticlesModel>()
+                        .HasOne(a => a.Category)
+                        .WithMany(c => c.Articles)
+                        .HasForeignKey(a => a.CategoryId);
 
-            modelBuilder.Entity<ArtigoModel>()
-                        .HasOne(a => a.Autor)
-                        .WithMany(b => b.Artigos)
-                        .HasForeignKey(a => a.AutorId);
+            modelBuilder.Entity<ArticlesModel>()
+                        .HasOne(a => a.Author)
+                        .WithMany(b => b.Articles)
+                        .HasForeignKey(a => a.AuthorId);
 
-            modelBuilder.Entity<ArtigoModel>()
-                        .HasOne(a => a.Fonte)
-                        .WithMany(f => f.Artigos)
-                        .HasForeignKey(a => a.FonteId)
+            modelBuilder.Entity<ArticlesModel>()
+                        .HasOne(a => a.Source)
+                        .WithMany(f => f.Articles)
+                        .HasForeignKey(a => a.SourceId)
                         .IsRequired(false);
 
-            modelBuilder.Entity<ComentarioModel>()
-                        .HasOne(c => c.Usuario)
-                        .WithMany(u => u.Comentarios)
-                        .HasForeignKey(c => c.UsuarioId);
+            modelBuilder.Entity<CommentModel>()
+                        .HasOne(c => c.User)
+                        .WithMany(u => u.Comments)
+                        .HasForeignKey(c => c.UserId);
 
-            modelBuilder.Entity<ComentarioModel>()
-                        .HasOne(c => c.Artigo)
-                        .WithMany(a => a.Comentarios)
-                        .HasForeignKey(c => c.ArtigoId);
+            modelBuilder.Entity<CommentModel>()
+                        .HasOne(c => c.Article)
+                        .WithMany(a => a.Comment)
+                        .HasForeignKey(c => c.ArticleId);
 
-            modelBuilder.Entity<NotificacaoModel>()
-                        .HasOne(n => n.Usuario)
-                        .WithMany(u => u.Notificacoes)
-                        .HasForeignKey(n => n.UsuarioId);
+            modelBuilder.Entity<NotificationModel>()
+                        .HasOne(n => n.User)
+                        .WithMany(u => u.Notification)
+                        .HasForeignKey(n => n.UserId);
 
-            modelBuilder.Entity<NotificacaoModel>()
-                        .HasOne(n => n.Artigo)
-                        .WithMany(a => a.Notificacoes)
-                        .HasForeignKey(n => n.ArtigoId)
+            modelBuilder.Entity<NotificationModel>()
+                        .HasOne(n => n.Article)
+                        .WithMany(a => a.Notification)
+                        .HasForeignKey(n => n.ArticleId)
                         .IsRequired(false);
             
-            modelBuilder.Entity<PesquisaCustomizadaModel>()
-                        .HasIndex(p => new { p.UsuarioId, p.CategoriaId, p.AutorId, p.FonteId })
+            modelBuilder.Entity<CustomizedResearchModel>()
+                        .HasIndex(c => new { c.UserId, c.CategoryId, c.AuthorId, c.SourceId })
                         .IsUnique();
                                         
-            modelBuilder.Entity<PesquisaCustomizadaModel>()
-                .HasOne(p => p.Usuario)
-                .WithMany(u => u.PesquisasCustomizadas)
-                .HasForeignKey(p => p.UsuarioId);
+            modelBuilder.Entity<CustomizedResearchModel>()
+                .HasOne(c => c.User)
+                .WithMany(u => u.CustomizedResearchModel)
+                .HasForeignKey(p => p.UserId);
 
-            modelBuilder.Entity<PesquisaCustomizadaModel>()
-                .HasOne(p => p.Categoria)
+            modelBuilder.Entity<CustomizedResearchModel>()
+                .HasOne(c => c.Category)
                 .WithMany()
-                .HasForeignKey(p => p.CategoriaId)
+                .HasForeignKey(p => p.CategoryId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            modelBuilder.Entity<PesquisaCustomizadaModel>()
-                .HasOne(p => p.Autor)
+            modelBuilder.Entity<CustomizedResearchModel>()
+                .HasOne(c => c.Author)
                 .WithMany()
-                .HasForeignKey(p => p.AutorId)
+                .HasForeignKey(p => p.AuthorId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            modelBuilder.Entity<PesquisaCustomizadaModel>()
-                .HasOne(p => p.Fonte)
+            modelBuilder.Entity<CustomizedResearchModel>()
+                .HasOne(c => c.Source)
                 .WithMany()
-                .HasForeignKey(p => p.FonteId)
+                .HasForeignKey(p => p.SourceId)
                 .OnDelete(DeleteBehavior.Restrict);
                     
         }
