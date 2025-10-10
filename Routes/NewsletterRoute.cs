@@ -8,15 +8,14 @@ public static class NewsletterRoute
 {
     public static void NewsletterRoutes(this WebApplication app)
     {
-        var route = app.MapGroup("/newsletter");
+        var route = app.MapGroup("/newsletter").WithTags("NewsLetters");
 
-        // POST
-        route.MapPost("", async (NewsletterRequest req, AppDbContext context) =>
+        route.MapPost("create", async (NewsletterRequest req, AppDbContext context) =>
         {
             var newsletter = new NewsletterModel
             {
                 Email = req.Email,
-                Ativo = req.Ativo
+                Active = req.Active
             };
 
             await context.Newsletters.AddAsync(newsletter);
@@ -24,34 +23,31 @@ public static class NewsletterRoute
             return Results.Created($"/newsletter/{newsletter.Id}", newsletter);
         });
 
-        // GET
-        route.MapGet("", async (AppDbContext context) =>
+        route.MapGet("show", async (AppDbContext context) =>
         {
             var newsletters = await context.Newsletters
-                                           .Where(n => n.Ativo)
+                                           .Where(n => n.Active)
                                            .ToListAsync();
             return Results.Ok(newsletters);
         });
 
-        // PUT
-        route.MapPut("/{id:int}", async (int id, NewsletterRequest req, AppDbContext context) =>
+        route.MapPut("/{id:int}/update", async (int id, NewsletterRequest req, AppDbContext context) =>
         {
-            var newsletter = await context.Newsletters.FirstOrDefaultAsync(n => n.Id == id && n.Ativo);
+            var newsletter = await context.Newsletters.FirstOrDefaultAsync(n => n.Id == id && n.Active);
             if (newsletter == null) return Results.NotFound();
 
             newsletter.Email = req.Email;
-            newsletter.Ativo = req.Ativo;
+            newsletter.Active = req.Active;
             await context.SaveChangesAsync();
             return Results.Ok(newsletter);
         });
 
-        // DELETE 
-        route.MapDelete("/{id:int}", async (int id, AppDbContext context) =>
+        route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
         {
-            var newsletter = await context.Newsletters.FirstOrDefaultAsync(n => n.Id == id && n.Ativo);
+            var newsletter = await context.Newsletters.FirstOrDefaultAsync(n => n.Id == id && n.Active);
             if (newsletter == null) return Results.NotFound();
 
-            newsletter.Ativo = false;
+            newsletter.Active = false;
             await context.SaveChangesAsync();
             return Results.Ok();
         });
