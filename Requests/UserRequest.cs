@@ -14,8 +14,8 @@ using System.ComponentModel.DataAnnotations;
         [MinLength(6, ErrorMessage = "A senha deve ter pelo menos 6 caracteres.")]
         public string? Password { get; set; }
 
-        [Required(ErrorMessage = "O papel (Role) é obrigatório.")]
-        public string Role { get; set; } = "User";
+        [Required(ErrorMessage = "O papel é obrigatório.")]
+        public string Role { get; set; } = "Leitor";
     }
 public record UserRegisterRequest(
         string Name,
