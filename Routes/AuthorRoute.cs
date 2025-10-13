@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using blogger_backend.Models;
 using blogger_backend.Data;
+using blogger_backend.Utils;
 
 namespace blogger_backend.Routes;
 
@@ -12,28 +13,78 @@ public static class AutorRoute
 
         route.MapPost("create", async (AuthorRequest req, AppDbContext context) =>
         {
-             bool exist = await context.Authores.AnyAsync(a =>
+            var errors = ValidationHelper.ValidateModel(req);
+            if (errors.Any())
+                return Results.BadRequest(new { Errors = errors });
+
+            bool exists = await context.Authores.AnyAsync(a =>
                 a.Active &&
                 (a.Email.ToLower() == req.Email.ToLower() ||
-                a.Name.ToLower() == req.Name.ToLower()));
+                 a.Name.ToLower() == req.Name.ToLower()));
 
-            if (exist)
-                return Results.BadRequest(new { Message = "Já existe um autor com este nome ou e-mail." });
+            if (exists)
+                return Results.BadRequest(new { Error = "Já existe um autor com este nome ou e-mail." });
 
             var author = new AuthorModel
             {
-                Name = req.Name,
-                Bio = req.Bio,
-                Email = req.Email,
+                Name = req.Name.Trim(),
+                Bio = req.Bio.Trim(),
+                Email = req.Email.Trim().ToLower(),
                 UserId = req.UserId,
                 Active = true
             };
 
             await context.Authores.AddAsync(author);
             await context.SaveChangesAsync();
-            return Results.Created($"/author/{author.Id}", author);
+
+            return Results.Created($"/author/{author.Id}", new
+            {
+                author.Id,
+                author.Name,
+                author.Email,
+                author.Bio,
+                author.UserId,
+                author.Active
+            });
         });
 
+        route.MapPut("/{id:int}/update", async (int id, AuthorRequest req, AppDbContext context) =>
+        {
+            var author = await context.Authores.FirstOrDefaultAsync(a => a.Id == id && a.Active);
+            if (author == null)
+                return Results.NotFound(new { Error = "Autor não encontrado." });
+
+            var errors = ValidationHelper.ValidateModel(req);
+            if (errors.Any())
+                return Results.BadRequest(new { Errors = errors });
+
+            bool duplicate = await context.Authores.AnyAsync(a =>
+                a.Id != id &&
+                a.Active &&
+                (a.Email.ToLower() == req.Email.ToLower() ||
+                 a.Name.ToLower() == req.Name.ToLower()));
+
+            if (duplicate)
+                return Results.BadRequest(new { Error = "Outro autor com o mesmo nome ou e-mail já existe." });
+
+            author.Name = req.Name.Trim();
+            author.Bio = req.Bio.Trim();
+            author.Email = req.Email.Trim().ToLower();
+            author.UserId = req.UserId;
+
+            await context.SaveChangesAsync();
+
+            return Results.Ok(new
+            {
+                author.Id,
+                author.Name,
+                author.Email,
+                author.Bio,
+                author.UserId,
+                author.Active
+            });
+        });
+    
         route.MapGet("show", async (AppDbContext context) =>
         {
             var autores = await context.Authores
@@ -42,28 +93,6 @@ public static class AutorRoute
             return Results.Ok(autores);
         });
 
-        route.MapPut("/{id:int}/update", async (int id, AuthorRequest req, AppDbContext context) =>
-        {
-            var author = await context.Authores.FirstOrDefaultAsync(a => a.Id == id && a.Active);
-            if (author == null) return Results.NotFound();
-
-            bool again = await context.Authores.AnyAsync(a =>
-                a.Id != id &&
-                a.Active &&
-                (a.Email.ToLower() == req.Email.ToLower() ||
-                a.Name.ToLower() == req.Name.ToLower()));
-
-            if (again)
-                return Results.BadRequest(new { Message = "Outro autor com o mesmo nome ou e-mail já existe." });
-
-            author.Name = req.Name;
-            author.Bio = req.Bio;
-            author.Email = req.Email;
-            author.UserId = req.UserId;
-
-            await context.SaveChangesAsync();
-            return Results.Ok(author);
-        });
 
         route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
         {

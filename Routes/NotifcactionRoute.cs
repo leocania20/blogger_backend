@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using blogger_backend.Models;
 using blogger_backend.Data;
+using System.Security.Claims;
 
 namespace blogger_backend.Routes;
 
@@ -31,13 +32,68 @@ public static class notificationRoute
 
         route.MapGet("show", async (AppDbContext context) =>
         {
-            var notification = await context.Notifications
-                                            .Where(n => n.Active)
-                                            .Include(n => n.User)
-                                            .Include(n => n.Article)
-                                            .ToListAsync();
-            return Results.Ok(notification);
+            var notifications = await context.Notifications
+            .Where(n => n.Active)
+            .Include(n => n.User)
+            .Include(n => n.Article)
+            .Select(n => new
+            {
+                n.Id,
+                n.Title,
+                n.Message,
+                n.Type,
+                n.Readed,
+                n.CreateDate,
+                User = n.User == null ? null : new
+                {
+                    Id = n.User.Id,
+                    Name = n.User.Name,
+                    Email = n.User.Email
+                },
+                Article = n.Article == null ? null : new
+                {
+                    Id = n.Article.Id,
+                    Title = n.Article.Title
+                }
+            })
+            .ToListAsync();
+
+            return Results.Ok(notifications);
         });
+        route.MapGet("/my-notifications", async (HttpContext http, AppDbContext context) =>
+        {
+            var userId = http.User.FindFirstValue("id");
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            int UserId = int.Parse(userId);
+            var notifications = await context.Notifications
+                .Where(n => n.Active && n.UserId == UserId)
+                .Include(n => n.User)
+                .Include(n => n.Article)
+                .Select(n => new {
+                    n.Id,
+                    n.Title,
+                    n.Message,
+                    n.Type,
+                    n.Readed,
+                    n.CreateDate,
+                    User = new {
+                        Id = n.User!.Id,
+                        Name = n.User.Name,
+                        Email = n.User.Email
+                    },
+                    Article = n.Article == null ? null : new {
+                        Id = n.Article.Id,
+                        Title = n.Article.Title
+                    }
+                })
+                .OrderByDescending(n => n.CreateDate)
+                .ToListAsync();
+
+            return Results.Ok(notifications);
+        }).RequireAuthorization();
+
 
         route.MapPut("/{id:int}/update", async (int id, NotificationRequest req, AppDbContext context) =>
         {

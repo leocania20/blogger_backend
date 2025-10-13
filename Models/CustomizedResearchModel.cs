@@ -1,14 +1,19 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace blogger_backend.Models
 {
     public class CustomizedResearchModel
     {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get; set; }
 
-     
+
         public int UserId { get; set; }
         public UserModel User { get; set; } = null!;
 
-        
+
         public int? CategoryId { get; set; }
         public CategoryModel? Category { get; set; }
 

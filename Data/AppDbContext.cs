@@ -92,8 +92,20 @@ namespace blogger_backend.Data
                         .IsRequired(false);
             
             modelBuilder.Entity<CustomizedResearchModel>()
-                        .HasIndex(c => new { c.UserId, c.CategoryId, c.AuthorId, c.SourceId })
-                        .IsUnique();
+                .HasIndex(c => new { c.UserId, c.CategoryId })
+                .IsUnique()
+                .HasFilter("\"CategoryId\" IS NOT NULL");
+
+            modelBuilder.Entity<CustomizedResearchModel>()
+                .HasIndex(c => new { c.UserId, c.AuthorId })
+                .IsUnique()
+                .HasFilter("\"AuthorId\" IS NOT NULL");
+
+            modelBuilder.Entity<CustomizedResearchModel>()
+                .HasIndex(c => new { c.UserId, c.SourceId })
+                .IsUnique()
+                .HasFilter("\"SourceId\" IS NOT NULL");
+
                                         
             modelBuilder.Entity<CustomizedResearchModel>()
                 .HasOne(c => c.User)

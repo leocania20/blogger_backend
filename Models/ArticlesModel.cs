@@ -4,7 +4,7 @@ namespace blogger_backend.Models
     {
         public int Id { get; set; }
         public string Title { get; set; } = null!;
-        public string Tag { get; set; } = null!;
+        public string? Tag { get; set; } = null!;
         public string Text { get; set; } = null!;
         public string Summary { get; set; } = null!;
         public DateTime CreateDate { get; set; } = DateTime.UtcNow;
