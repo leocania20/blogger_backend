@@ -18,7 +18,7 @@ public static class UserRoute
         {
             var errors = ValidationHelper.ValidateModel(req);
             if (errors.Any())
-                return Results.BadRequest(new { Errors = errors });
+                return Results.BadRequest(new { Errors = "A palavra passe deve ter no mínimo 6 digitos" });
 
             if (await context.Users.AnyAsync(u => u.Email == req.Email))
                 return Results.BadRequest(new { Error = "Já existe um usuário com este e-mail." });

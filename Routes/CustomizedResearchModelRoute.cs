@@ -10,7 +10,7 @@ public static class CustomizedResearchRoute
     {
         var route = app.MapGroup("/seetigns").WithTags("Seetings").RequireAuthorization();
 
-        route.MapPost("/settings/up", async (HttpContext http, List<CustomizedResearchRequest> reqList, AppDbContext context) =>
+        route.MapPost("/up", async (HttpContext http, List<CustomizedResearchRequest> reqList, AppDbContext context) =>
         {
             var userId = http.User.FindFirst("id")?.Value;
             if (string.IsNullOrEmpty(userId))
