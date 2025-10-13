@@ -16,7 +16,11 @@ public static class UserRoute
 
         route.MapPost("/signup", async (UserRequest req, AppDbContext context, IPasswordHasher<UserModel> hasher) =>
         {
-             if (await context.Users.AnyAsync(u => u.Email == req.Email))
+            var errors = ValidationHelper.ValidateModel(req);
+            if (errors.Any())
+                return Results.BadRequest(new { Errors = errors });
+
+            if (await context.Users.AnyAsync(u => u.Email == req.Email))
                 return Results.BadRequest(new { Error = "Já existe um usuário com este e-mail." });
 
             if (await context.Users.AnyAsync(u => u.Name == req.Name))
@@ -31,7 +35,7 @@ public static class UserRoute
                 CreateDate = DateTime.UtcNow
             };
 
-            user.Password = hasher.HashPassword(user, req.Password);
+            user.Password = hasher.HashPassword(user, req.Password!);
 
             await context.Users.AddAsync(user);
             await context.SaveChangesAsync();
@@ -46,7 +50,6 @@ public static class UserRoute
             });
         });
 
-        // Login
         route.MapPost("/signin", async (
             UserLoginRequest req,
             AppDbContext context,
@@ -83,22 +86,33 @@ public static class UserRoute
 
         route.MapGet("show", async (AppDbContext context) =>
         {
-            var usuarios = await context.Users.ToListAsync();
-            return Results.Ok(usuarios.Select(u => new {
-                u.Id, u.Name, u.Email, u.Role, u.CreateDate, u.Active
+            var usuariosAtivos = await context.Users
+            .Where(u => u.Active) 
+            .ToListAsync();
+
+            return Results.Ok(usuariosAtivos.Select(u => new
+            {
+                u.Id,
+                u.Name,
+                u.Email,
+                u.Role,
+                u.CreateDate
             }));
         });
 
-        route.MapPut("/{id:int}update", async (int id, UserRequest req, AppDbContext context, IPasswordHasher<UserModel> hasher) =>
+        route.MapPut("/{id:int}/update", async (int id, UserRequest req, AppDbContext context, IPasswordHasher<UserModel> hasher) =>
         {
-            var user = await context.Users.FirstOrDefaultAsync(u => u.Id == id);
-            if (user == null) return Results.NotFound();
+            var errors = ValidationHelper.ValidateModel(req);
+            if (errors.Any())
+                return Results.BadRequest(new { Errors = errors });
 
-            
+            var user = await context.Users.FirstOrDefaultAsync(u => u.Id == id);
+            if (user == null)
+                return Results.NotFound(new { Error = "Usuário não encontrado." });
+
             if (await context.Users.AnyAsync(u => u.Email == req.Email && u.Id != id))
                 return Results.BadRequest(new { Error = "Já existe outro usuário com este e-mail." });
 
-            
             if (await context.Users.AnyAsync(u => u.Name == req.Name && u.Id != id))
                 return Results.BadRequest(new { Error = "Já existe outro usuário com este nome." });
 
@@ -121,6 +135,7 @@ public static class UserRoute
                 user.CreateDate
             });
         });
+
 
         route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
         {

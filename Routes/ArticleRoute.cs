@@ -23,9 +23,13 @@ public static class ArticleRoute
 
         route.MapPost("create", async (ArticleRequest req, AppDbContext context, IConfiguration config) =>
         {
+            var errors = ValidationHelper.ValidateModel(req);
+            if (errors.Any())
+                return Results.BadRequest(new { Errors = errors });
+
             var imagemUrl = getImagem(req.Imagem, config);
 
-            var articles = new ArticlesModel
+            var article = new ArticlesModel
             {
                 Title = req.Title,
                 Tag = req.Tag,
@@ -40,16 +44,21 @@ public static class ArticleRoute
                 Imagem = imagemUrl
             };
 
-            await context.Articles.AddAsync(articles);
+            await context.Articles.AddAsync(article);
             await context.SaveChangesAsync();
 
-            return Results.Created($"/article/{articles.Id}", articles);
+            return Results.Created($"/article/{article.Id}", article);
         });
 
         route.MapPut("/{id:int}/update", async (int id, ArticleRequest req, AppDbContext context, IConfiguration config) =>
         {
             var article = await context.Articles.FirstOrDefaultAsync(a => a.Id == id);
-            if (article == null) return Results.NotFound();
+            if (article == null)
+                return Results.NotFound(new { Error = "Artigo não encontrado." });
+
+            var errors = ValidationHelper.ValidateModel(req);
+            if (errors.Any())
+                return Results.BadRequest(new { Errors = errors });
 
             article.Title = req.Title;
             article.Tag = req.Tag;

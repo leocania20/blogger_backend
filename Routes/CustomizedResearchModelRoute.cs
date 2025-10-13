@@ -8,9 +8,9 @@ public static class CustomizedResearchRoute
 {
     public static void PesquisaCustomizadaRoutes(this WebApplication app)
     {
-        var route = app.MapGroup("/seetigns").WithTags("Seetings").RequireAuthorization(); 
+        var route = app.MapGroup("/seetigns").WithTags("Seetings").RequireAuthorization();
 
-        route.MapPost("up", async (CustomizedResearchRequest req, AppDbContext context, HttpContext http) =>
+        route.MapPost("/settings/up", async (HttpContext http, List<CustomizedResearchRequest> reqList, AppDbContext context) =>
         {
             var userId = http.User.FindFirst("id")?.Value;
             if (string.IsNullOrEmpty(userId))
@@ -18,46 +18,95 @@ public static class CustomizedResearchRoute
 
             int usersId = int.Parse(userId);
 
-            bool alreadyExist = await context.CustomizedResearches.AnyAsync(c=>
-                c.UserId == usersId &&
-                c.CategoryId == req.CategoryId &&
-                c.AuthorId == req.AuthorId &&
-                c.SourceId == req.SourceId
-            );
+            var savedList = new List<object>();
+            var ignoredList = new List<object>();
 
-            if (alreadyExist)
-                return Results.BadRequest(new { Message = "Essa combinação de categoria, autor e fonte já foi salva para este usuário." });
-
-            var seeting = new CustomizedResearchModel
+            foreach (var req in reqList)
             {
-                UserId = usersId,
-                CategoryId = req.CategoryId,
-                AuthorId = req.AuthorId,
-                SourceId = req.SourceId,
-                CreateDate = DateTime.UtcNow
-            };
+                bool hasCategory = req.CategoryId != 0;
+                bool hasAuthor = req.AuthorId != 0;
+                bool hasSource = req.SourceId != 0;
 
-            try
-            {
-                await context.CustomizedResearches.AddAsync(seeting);
+                if (!hasCategory && !hasAuthor && !hasSource)
+                {
+                    return Results.BadRequest("Deve ser informado pelo menos um dos campos: CategoryId, AuthorId ou SourceId.");
+                }
+                bool alreadyExists = false;
+                if (hasCategory)
+                {
+                    alreadyExists = await context.CustomizedResearches
+                        .AnyAsync(c => c.UserId == usersId && c.CategoryId == req.CategoryId);
+
+                    if (alreadyExists)
+                    {
+                        ignoredList.Add(new { Tipo = "Categoria", Id = req.CategoryId });
+                        continue; 
+                    }
+                }
+
+                if (hasAuthor)
+                {
+                    alreadyExists = await context.CustomizedResearches
+                        .AnyAsync(c => c.UserId == usersId && c.AuthorId == req.AuthorId);
+
+                    if (alreadyExists)
+                    {
+                        ignoredList.Add(new { Tipo = "Autor", Id = req.AuthorId });
+                        continue;
+                    }
+                }
+
+                if (hasSource)
+                {
+                    alreadyExists = await context.CustomizedResearches
+                        .AnyAsync(c => c.UserId == usersId && c.SourceId == req.SourceId);
+
+                    if (alreadyExists)
+                    {
+                        ignoredList.Add(new { Tipo = "Fonte", Id = req.SourceId });
+                        continue;
+                    }
+                }
+                var newResearch = new CustomizedResearchModel
+                {
+                    UserId = usersId,
+                    CategoryId = hasCategory ? req.CategoryId : null,
+                    AuthorId = hasAuthor ? req.AuthorId : null,
+                    SourceId = hasSource ? req.SourceId : null,
+                    CreateDate = DateTime.UtcNow
+                };
+
+                await context.CustomizedResearches.AddAsync(newResearch);
                 await context.SaveChangesAsync();
-            }
-            catch (DbUpdateException)
-            {
-                return Results.BadRequest(new { Message = "Registro duplicado detectado. Essa preferência já existe." });
-            }
 
-            return Results.Created($"/seeting/{seeting.Id}", new
+                savedList.Add(new
+                {
+                    newResearch.Id,
+                    newResearch.UserId,
+                    newResearch.CategoryId,
+                    newResearch.AuthorId,
+                    newResearch.SourceId,
+                    newResearch.CreateDate
+                });
+            }
+            return Results.Ok(new
             {
-                seeting.Id,
-                seeting.UserId,
-                seeting.CategoryId,
-                seeting.AuthorId,
-                seeting.SourceId,
-                seeting.CreateDate
+                mensagem = "Operação concluída com sucesso.",
+                adicionados = savedList.Count,
+                ignorados = ignoredList.Count,
+                registros_adicionados = savedList,
+                registros_ignorados = ignoredList
             });
-        });
 
+        })
+        .WithName("CustomizedResearchCreate")
+        .WithSummary("Cadastra pesquisas personalizadas (Categoria, Autor ou Fonte)")
+        .WithDescription("Permite cadastrar uma ou várias pesquisas personalizadas associadas a um usuário autenticado. Ignora itens duplicados já cadastrados para o mesmo usuário.")
+        .Produces(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status400BadRequest)
+        .Produces(StatusCodes.Status401Unauthorized);
+
+    
         route.MapGet("show", async (HttpContext http, AppDbContext context) =>
          {
              var userId = http.User.FindFirstValue("id");

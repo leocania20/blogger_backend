@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using blogger_backend.Models;
 using blogger_backend.Data;
+using blogger_backend.Utils;
+using blogger_backend.Requests;
 
 namespace blogger_backend.Routes;
 
@@ -10,42 +12,44 @@ public static class FonteRoute
     {
         var route = app.MapGroup("/source").WithTags("Sources");;
 
-        route.MapPost("create", async (SourceRequest req, AppDbContext context) =>
+    route.MapPost("create", async (SourceRequest req, AppDbContext context) =>
+    {
+        var validationErrors = ValidationHelper.ValidateModel(req);
+        if (validationErrors.Any())
+            return Results.BadRequest(new { Errors = validationErrors });
+
+        bool exist = await context.Sources.AnyAsync(f =>
+            f.Active &&
+            (f.Name.ToLower() == req.Name.ToLower() ||
+            f.URL.ToLower() == req.URL.ToLower()));
+
+        if (exist)
+            return Results.BadRequest(new { Message = "Já existe uma fonte com este nome ou URL." });
+
+        var source = new SourceModel
         {
-            bool exist = await context.Sources.AnyAsync(f =>
-                f.Active &&
-                (f.Name.ToLower() == req.Name.ToLower() ||
-                f.URL.ToLower() == req.URL.ToLower()));
+            Name = req.Name,
+            URL = req.URL,
+            Type = req.Type,
+            Active = true
+        };
 
-            if (exist)
-                return Results.BadRequest(new { Message = "Já existe uma fonte com este nome ou URL." });
+        await context.Sources.AddAsync(source);
+        await context.SaveChangesAsync();
 
-            var source = new SourceModel
-            {
-                Name = req.Name,
-                URL = req.URL,
-                Type = req.Type,
-                Active = true
-            };
-
-            await context.Sources.AddAsync(source);
-            await context.SaveChangesAsync();
-            return Results.Created($"/source/{source.Id}", source);
-        });
-
-        route.MapGet("show", async (AppDbContext context) =>
-        {
-            var source = await context.Sources
-                                      .Where(f => f.Active)
-                                      .ToListAsync();
-            return Results.Ok(source);
-        });
+        return Results.Created($"/source/{source.Id}", source);
+    });
 
         route.MapPut("/{id:int}/update", async (int id, SourceRequest req, AppDbContext context) =>
         {
+            var validationErrors = ValidationHelper.ValidateModel(req);
+            if (validationErrors.Any())
+                return Results.BadRequest(new { Errors = validationErrors });
+
             var source = await context.Sources.FirstOrDefaultAsync(f => f.Id == id && f.Active);
-            if (source == null) return Results.NotFound();
-            
+            if (source == null)
+                return Results.NotFound();
+
             bool again = await context.Sources.AnyAsync(f =>
                 f.Id != id &&
                 f.Active &&
@@ -58,10 +62,19 @@ public static class FonteRoute
             source.Name = req.Name;
             source.URL = req.URL;
             source.Type = req.Type;
+
             await context.SaveChangesAsync();
             return Results.Ok(source);
         });
 
+        route.MapGet("show", async (AppDbContext context) =>
+        {
+            var source = await context.Sources
+                                      .Where(f => f.Active)
+                                      .ToListAsync();
+            return Results.Ok(source);
+        });
+        
         route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
         {
             var source = await context.Sources.FirstOrDefaultAsync(f => f.Id == id && f.Active);

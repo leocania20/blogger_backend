@@ -68,3 +68,53 @@ VALUES
 (10, 'Mudanças Climáticas e Energia Sustentável', 'clima', 'Como o aquecimento global afeta o futuro da energia...', 'Soluções verdes em pauta.', NOW(), NULL, NOW(), true, 'https://blogger-backend-6.onrender.com//uploads/artigos/d0a39c40120c2c0e4754d627c83b9333f7aa2a74.jpg', 6, 4, 7);
 
 
+-- ==============================
+-- 🚀 Função: cria notificações automáticas ao cadastrar artigo
+-- ==============================
+
+CREATE OR REPLACE FUNCTION fn_notify_users_on_new_article()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Apenas cria notificação se o artigo estiver publicado
+    IF NEW."IsPublished" = TRUE THEN
+        INSERT INTO "Notifications" (
+            "Title",
+            "Message",
+            "Type",
+            "Readed",
+            "CreateDate",
+            "Active",
+            "UserId",
+            "ArticleId"
+        )
+        SELECT DISTINCT
+            'Novo artigo publicado: ' || NEW."Title" AS "Title",
+            'Um novo artigo relacionado às suas preferências foi publicado.' AS "Message",
+            'Artigo' AS "Type",
+            FALSE AS "Readed",
+            NOW() AS "CreateDate",
+            TRUE AS "Active",
+            cr."UserId",
+            NEW."Id"
+        FROM "CustomizedResearches" cr
+        WHERE
+            (cr."CategoryId" IS NOT NULL AND cr."CategoryId" = NEW."CategoryId")
+            OR (cr."AuthorId" IS NOT NULL AND cr."AuthorId" = NEW."AuthorId")
+            OR (cr."SourceId" IS NOT NULL AND cr."SourceId" = NEW."SourceId")
+        -- evita notificações duplicadas
+        AND NOT EXISTS (
+            SELECT 1 FROM "Notifications" n
+            WHERE n."UserId" = cr."UserId"
+              AND n."ArticleId" = NEW."Id"
+        );
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE TRIGGER trg_notify_on_article_insert
+AFTER INSERT ON "Articles"
+FOR EACH ROW
+EXECUTE FUNCTION fn_notify_users_on_new_article();

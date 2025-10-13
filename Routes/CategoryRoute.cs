@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using blogger_backend.Models;
 using blogger_backend.Data;
+using blogger_backend.Utils;
 
 namespace blogger_backend.Routes;
 
@@ -12,10 +13,14 @@ public static class CategoryRoute
 
         route.MapPost("create", async (CategoryRequest req, AppDbContext context) =>
         {
-             bool exist = await context.Categories.AnyAsync(c =>
+            var errors = ValidationHelper.ValidateModel(req);
+            if (errors.Any())
+                return Results.BadRequest(new { Errors = errors });
+
+            bool exist = await context.Categories.AnyAsync(c =>
                 c.Active &&
                 (c.Name.ToLower() == req.Name.ToLower() ||
-                c.Tag.ToLower() == req.Tag.ToLower()));
+                    c.Tag.ToLower() == req.Tag.ToLower()));
 
             if (exist)
                 return Results.BadRequest(new { Message = "Já existe uma categoria com este nome ou tag." });
@@ -30,32 +35,28 @@ public static class CategoryRoute
 
             await context.Categories.AddAsync(category);
             await context.SaveChangesAsync();
-            return Results.Created($"/category/{category.Id}", category);
-        });
 
-        route.MapGet("show", async (AppDbContext context) =>
-        {
-            var categories = await context.Categories
-                                          .Where(c => c.Active)
-                                          .ToListAsync();
-            return Results.Ok(categories);
+            return Results.Created($"/category/{category.Id}", category);
         });
 
         route.MapPut("/{id:int}/update", async (int id, CategoryRequest req, AppDbContext context) =>
         {
             var category = await context.Categories.FirstOrDefaultAsync(c => c.Id == id && c.Active);
-            if (category == null) return Results.NotFound();
-            
+            if (category == null)
+                return Results.NotFound(new { Message = "Categoria não encontrada." });
+
+            var errors = ValidationHelper.ValidateModel(req);
+            if (errors.Any())
+                return Results.BadRequest(new { Errors = errors });
 
             bool again = await context.Categories.AnyAsync(c =>
                 c.Id != id &&
                 c.Active &&
                 (c.Name.ToLower() == req.Name.ToLower() ||
-                c.Tag.ToLower() == req.Tag.ToLower()));
+                    c.Tag.ToLower() == req.Tag.ToLower()));
 
             if (again)
                 return Results.BadRequest(new { Message = "Já existe outra categoria com o mesmo nome ou tag." });
-
 
             category.Name = req.Name;
             category.Description = req.Description;
@@ -64,6 +65,14 @@ public static class CategoryRoute
 
             await context.SaveChangesAsync();
             return Results.Ok(category);
+        });
+        
+        route.MapGet("show", async (AppDbContext context) =>
+        {
+            var categories = await context.Categories
+                                          .Where(c => c.Active)
+                                          .ToListAsync();
+            return Results.Ok(categories);
         });
 
         route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
