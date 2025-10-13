@@ -23,9 +23,9 @@ public static class ArticleRoute
 
         route.MapPost("create", async (ArticleRequest req, AppDbContext context, IConfiguration config) =>
         {
-            var errors = ValidationHelper.ValidateModel(req);
-            if (errors.Any())
-                return Results.BadRequest(new { Errors = errors });
+            var error = ValidationHelper.ValidateModel(req);
+            if (error.Any())
+                return Results.BadRequest(new { Errors = error });
 
             var imagemUrl = getImagem(req.Imagem, config);
 
@@ -56,9 +56,9 @@ public static class ArticleRoute
             if (article == null)
                 return Results.NotFound(new { Error = "Artigo não encontrado." });
 
-            var errors = ValidationHelper.ValidateModel(req);
-            if (errors.Any())
-                return Results.BadRequest(new { Errors = errors });
+            var error = ValidationHelper.ValidateModel(req);
+            if (error.Any())
+                return Results.BadRequest(new { Errors = error });
 
             article.Title = req.Title;
             article.Tag = req.Tag;

@@ -13,9 +13,9 @@ public static class AutorRoute
 
         route.MapPost("create", async (AuthorRequest req, AppDbContext context) =>
         {
-            var errors = ValidationHelper.ValidateModel(req);
-            if (errors.Any())
-                return Results.BadRequest(new { Errors = errors });
+            var error = ValidationHelper.ValidateModel(req);
+            if (error.Any())
+                return Results.BadRequest(new { Errors = error });
 
             bool exists = await context.Authores.AnyAsync(a =>
                 a.Active &&
@@ -54,9 +54,9 @@ public static class AutorRoute
             if (author == null)
                 return Results.NotFound(new { Error = "Autor não encontrado." });
 
-            var errors = ValidationHelper.ValidateModel(req);
-            if (errors.Any())
-                return Results.BadRequest(new { Errors = errors });
+            var error = ValidationHelper.ValidateModel(req);
+            if (error.Any())
+                return Results.BadRequest(new { Errors = error });
 
             bool duplicate = await context.Authores.AnyAsync(a =>
                 a.Id != id &&

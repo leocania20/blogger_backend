@@ -13,9 +13,9 @@ public static class CategoryRoute
 
         route.MapPost("create", async (CategoryRequest req, AppDbContext context) =>
         {
-            var errors = ValidationHelper.ValidateModel(req);
-            if (errors.Any())
-                return Results.BadRequest(new { Errors = errors });
+            var error = ValidationHelper.ValidateModel(req);
+            if (error.Any())
+                return Results.BadRequest(new { Errors = error });
 
             bool exist = await context.Categories.AnyAsync(c =>
                 c.Active &&
@@ -45,9 +45,9 @@ public static class CategoryRoute
             if (category == null)
                 return Results.NotFound(new { Message = "Categoria não encontrada." });
 
-            var errors = ValidationHelper.ValidateModel(req);
-            if (errors.Any())
-                return Results.BadRequest(new { Errors = errors });
+            var error = ValidationHelper.ValidateModel(req);
+            if (error.Any())
+                return Results.BadRequest(new { Errors = error });
 
             bool again = await context.Categories.AnyAsync(c =>
                 c.Id != id &&
