@@ -9,13 +9,23 @@ public static class AutorRoute
 {
     public static void AuthorRoutes(this WebApplication app)
     {
-        var route = app.MapGroup("/author").WithTags("Authores");
+        var route = app.MapGroup("/author").WithTags("Authors");
 
         route.MapPost("create", async (AuthorRequest req, AppDbContext context) =>
         {
             var error = ValidationHelper.ValidateModel(req);
             if (error.Any())
-                return Results.BadRequest(new { Errors = error });
+                return ResponseHelper.BadRequest(
+                    "Os dados enviados são inválidos.",
+                    error,
+                    new
+                    {
+                        name = "José Silva",
+                        bio = "Autor especializado em tecnologia e inovação.",
+                        email = "jose.silva@example.com",
+                        userId = 1
+                    }
+                );
 
             bool exists = await context.Authores.AnyAsync(a =>
                 a.Active &&
@@ -23,7 +33,16 @@ public static class AutorRoute
                  a.Name.ToLower() == req.Name.ToLower()));
 
             if (exists)
-                return Results.BadRequest(new { Error = "Já existe um autor com este nome ou e-mail." });
+                return ResponseHelper.Conflict(
+                    "Já existe um autor com este nome ou e-mail.",
+                    new
+                    {
+                        name = "Novo Autor",
+                        bio = "Breve descrição sobre o autor.",
+                        email = "novo.email@example.com",
+                        userId = 1
+                    }
+                );
 
             var author = new AuthorModel
             {
@@ -34,29 +53,56 @@ public static class AutorRoute
                 Active = true
             };
 
-            await context.Authores.AddAsync(author);
-            await context.SaveChangesAsync();
-
-            return Results.Created($"/author/{author.Id}", new
+            try
             {
-                author.Id,
-                author.Name,
-                author.Email,
-                author.Bio,
-                author.UserId,
-                author.Active
-            });
+                await context.Authores.AddAsync(author);
+                await context.SaveChangesAsync();
+
+                return ResponseHelper.Created($"/author/{author.Id}", new
+                {
+                    author.Id,
+                    author.Name,
+                    author.Email,
+                    author.Bio,
+                    author.UserId,
+                    author.Active
+                }, "Autor criado com sucesso.");
+            }
+            catch (Exception ex)
+            {
+                return ResponseHelper.ServerError($"Erro ao criar autor: {ex.Message}");
+            }
         });
 
         route.MapPut("/{id:int}/update", async (int id, AuthorRequest req, AppDbContext context) =>
         {
             var author = await context.Authores.FirstOrDefaultAsync(a => a.Id == id && a.Active);
             if (author == null)
-                return Results.NotFound(new { Error = "Autor não encontrado." });
+                return ResponseHelper.NotFound(
+                    $"Autor com ID {id} não encontrado.",
+                    new
+                    {
+                        id = 1,
+                        name = "José Silva",
+                        bio = "Atualização da biografia.",
+                        email = "jose.silva@update.com",
+                        userId = 1
+                    }
+                );
 
             var error = ValidationHelper.ValidateModel(req);
             if (error.Any())
-                return Results.BadRequest(new { Errors = error });
+                return ResponseHelper.BadRequest(
+                    "Os dados enviados são inválidos.",
+                    error,
+                    new
+                    {
+                        name = "João Pereira",
+                        bio = "Autor experiente em ciência de dados.",
+                        email = "joao.pereira@example.com",
+                        userId = 2
+                    }
+                );
 
             bool duplicate = await context.Authores.AnyAsync(a =>
                 a.Id != id &&
@@ -65,43 +111,92 @@ public static class AutorRoute
                  a.Name.ToLower() == req.Name.ToLower()));
 
             if (duplicate)
-                return Results.BadRequest(new { Error = "Outro autor com o mesmo nome ou e-mail já existe." });
+                return ResponseHelper.Conflict(
+                    "Outro autor com o mesmo nome ou e-mail já existe.",
+                    new
+                    {
+                        name = "Maria Costa",
+                        bio = "Autora de artigos sobre economia.",
+                        email = "maria.costa@example.com",
+                        userId = 3
+                    }
+                );
 
             author.Name = req.Name.Trim();
             author.Bio = req.Bio.Trim();
             author.Email = req.Email.Trim().ToLower();
             author.UserId = req.UserId;
 
-            await context.SaveChangesAsync();
-
-            return Results.Ok(new
+            try
             {
-                author.Id,
-                author.Name,
-                author.Email,
-                author.Bio,
-                author.UserId,
-                author.Active
-            });
+                await context.SaveChangesAsync();
+
+                return ResponseHelper.Ok(new
+                {
+                    author.Id,
+                    author.Name,
+                    author.Email,
+                    author.Bio,
+                    author.UserId,
+                    author.Active
+                }, "Autor atualizado com sucesso.");
+            }
+            catch (Exception ex)
+            {
+                return ResponseHelper.ServerError($"Erro ao atualizar autor: {ex.Message}");
+            }
         });
-    
+
         route.MapGet("show", async (AppDbContext context) =>
         {
             var autores = await context.Authores
-                                      .Where(a => a.Active)
-                                      .ToListAsync();
-            return Results.Ok(autores);
-        });
+                .Where(a => a.Active)
+                .Select(a => new
+                {
+                    a.Id,
+                    a.Name
+                })
+                .ToListAsync();
 
+            if (!autores.Any())
+            {
+                return ResponseHelper.NotFound(
+                    "Nenhum autor ativo encontrado.",
+                    new
+                    {
+                        exemplo = "Crie um autor usando POST /author/create"
+                    }
+                );
+            }
+
+            return ResponseHelper.Ok(autores, "Lista de autores ativos.");
+        });
 
         route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
         {
             var author = await context.Authores.FirstOrDefaultAsync(a => a.Id == id && a.Active);
-            if (author == null) return Results.NotFound();
+            if (author == null)
+                return ResponseHelper.NotFound(
+                    $"Autor com ID {id} não encontrado.",
+                    new { id = 1 }
+                );
 
-            author.Active = false; 
-            await context.SaveChangesAsync();
-            return Results.Ok();
+            author.Active = false;
+
+            try
+            {
+                await context.SaveChangesAsync();
+                return ResponseHelper.Ok(new
+                {
+                    author.Id,
+                    author.Name,
+                    author.Email
+                }, "Autor desativado com sucesso.");
+            }
+            catch (Exception ex)
+            {
+                return ResponseHelper.ServerError($"Erro ao desativar autor: {ex.Message}");
+            }
         });
     }
 }

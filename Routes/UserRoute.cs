@@ -16,135 +16,181 @@ public static class UserRoute
 
         route.MapPost("/signup", async (UserRequest req, AppDbContext context, IPasswordHasher<UserModel> hasher) =>
         {
-            var errors = ValidationHelper.ValidateModel(req);
-            if (errors.Any())
-                return Results.BadRequest(new { Error = "A palavra passe deve ter no mínimo 6 digitos" });
-
-            if (await context.Users.AnyAsync(u => u.Email == req.Email))
-                return Results.BadRequest(new { Error = "Já existe um usuário com este e-mail." });
-
-            if (await context.Users.AnyAsync(u => u.Name == req.Name))
-                return Results.BadRequest(new { Error = "Já existe um usuário com este nome." });
-
-            var user = new UserModel
+            try
             {
-                Name = req.Name,
-                Email = req.Email,
-                Role = req.Role,
-                Active = true,
-                CreateDate = DateTime.UtcNow
-            };
+                var errors = ValidationHelper.ValidateModel(req);
+                if (errors.Any())
+                    return ResponseHelper.BadRequest("Dados inválidos.", errors, new { Exemplo = "A palavra-passe deve ter no mínimo 6 dígitos." });
 
-            user.Password = hasher.HashPassword(user, req.Password!);
+                if (await context.Users.AnyAsync(u => u.Email == req.Email))
+                    return ResponseHelper.Conflict("Já existe um usuário com este e-mail.", new { req.Email });
 
-            await context.Users.AddAsync(user);
-            await context.SaveChangesAsync();
+                if (await context.Users.AnyAsync(u => u.Name == req.Name))
+                    return ResponseHelper.Conflict("Já existe um usuário com este nome.", new { req.Name });
 
-            return Results.Created($"/user/{user.Id}", new {
-                user.Id,
-                user.Name,
-                user.Email,
-                user.Role,
-                user.Active,
-                user.CreateDate
-            });
+                var user = new UserModel
+                {
+                    Name = req.Name,
+                    Email = req.Email,
+                    Role = req.Role,
+                    Active = true,
+                    CreateDate = DateTime.UtcNow
+                };
+
+                user.Password = hasher.HashPassword(user, req.Password!);
+
+                await context.Users.AddAsync(user);
+                await context.SaveChangesAsync();
+
+                return ResponseHelper.Created($"/user/{user.Id}", new
+                {
+                    user.Id,
+                    user.Name,
+                    user.Email,
+                    user.Role,
+                    user.Active,
+                    user.CreateDate
+                });
+            }
+            catch (Exception ex)
+            {
+                return ResponseHelper.ServerError(ex.Message);
+            }
         });
+
 
         route.MapPost("/signin", async (
             UserLoginRequest req,
             AppDbContext context,
             IPasswordHasher<UserModel> hasher) =>
         {
-            var user = await context.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
-            if (user == null || !user.Active)
-                return Results.Unauthorized();
+            try
+            {
+                var user = await context.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
+                if (user == null || !user.Active)
+                    return ResponseHelper.NotFound("Usuário não encontrado ou desativado.", new { req.Email });
 
-            var result = hasher.VerifyHashedPassword(user, user.Password, req.Password);
-            if (result == PasswordVerificationResult.Failed)
-                return Results.Unauthorized();
+                var result = hasher.VerifyHashedPassword(user, user.Password, req.Password);
+                if (result == PasswordVerificationResult.Failed)
+                    return ResponseHelper.BadRequest("Credenciais incorretas.", null, new { Email = req.Email, Password = "********" });
 
-            string secretKey = config["Jwt:Key"] ?? "chave-secreta-superforte-com-32-caracteres!";
-            string token = JwtTokenService.GenerateToken(user.Email, user.Role, secretKey, user.Id, user.Name);
+                string secretKey = config["Jwt:Key"] ?? "chave-secreta-superforte-com-32-caracteres!";
+                string token = JwtTokenService.GenerateToken(user.Email, user.Role, secretKey, user.Id, user.Name);
 
-            return Results.Ok(new { Token = $"Bearer {token}" });
+                return ResponseHelper.Ok(new { Token = $"Bearer {token}" }, "Login realizado com sucesso.");
+            }
+            catch (Exception ex)
+            {
+                return ResponseHelper.ServerError(ex.Message);
+            }
         });
 
         route.MapGet("/profile", [Authorize] (HttpContext http) =>
         {
-            var email = http.User.FindFirstValue(ClaimTypes.Name);
-            var role  = http.User.FindFirstValue(ClaimTypes.Role);
-            var id    = http.User.FindFirstValue("id");
-            var name  = http.User.FindFirstValue("name");
-
-            return Results.Ok(new
+            try
             {
-                Email = email,
-                Nome=name
-            });
-        });
+                var email = http.User.FindFirstValue(ClaimTypes.Name);
+                var role = http.User.FindFirstValue(ClaimTypes.Role);
+                var id = http.User.FindFirstValue("id");
+                var name = http.User.FindFirstValue("name");
 
+                return ResponseHelper.Ok(new
+                {
+                    Id = id,
+                    Nome = name,
+                    Email = email,
+                    Role = role
+                }, "Perfil obtido com sucesso.");
+            }
+            catch (Exception ex)
+            {
+                return ResponseHelper.ServerError(ex.Message);
+            }
+        });
 
         route.MapGet("show", async (AppDbContext context) =>
         {
-            var usuariosAtivos = await context.Users
-            .Where(u => u.Active) 
-            .ToListAsync();
-
-            return Results.Ok(usuariosAtivos.Select(u => new
+            try
             {
-                u.Id,
-                u.Name,
-                u.Email,
-                u.Role,
-                u.CreateDate
-            }));
+                var usuariosAtivos = await context.Users
+                    .Where(u => u.Active)
+                    .ToListAsync();
+
+                return ResponseHelper.Ok(usuariosAtivos.Select(u => new
+                {
+                    u.Id,
+                    u.Name,
+                    u.Email,
+                    u.Role,
+                    u.CreateDate
+                }), "Lista de usuários ativos obtida com sucesso.");
+            }
+            catch (Exception ex)
+            {
+                return ResponseHelper.ServerError(ex.Message);
+            }
         });
 
         route.MapPut("/{id:int}/update", async (int id, UserRequest req, AppDbContext context, IPasswordHasher<UserModel> hasher) =>
         {
-            var errors = ValidationHelper.ValidateModel(req);
-            if (errors.Any())
-                return Results.BadRequest(new { Errors = errors });
+            try
+            {
+                var errors = ValidationHelper.ValidateModel(req);
+                if (errors.Any())
+                    return ResponseHelper.BadRequest("Dados inválidos.", errors);
 
-            var user = await context.Users.FirstOrDefaultAsync(u => u.Id == id);
-            if (user == null)
-                return Results.NotFound(new { Error = "Usuário não encontrado." });
+                var user = await context.Users.FirstOrDefaultAsync(u => u.Id == id);
+                if (user == null)
+                    return ResponseHelper.NotFound("Usuário não encontrado.", new { Id = id });
 
-            if (await context.Users.AnyAsync(u => u.Email == req.Email && u.Id != id))
-                return Results.BadRequest(new { Error = "Já existe outro usuário com este e-mail." });
+                if (await context.Users.AnyAsync(u => u.Email == req.Email && u.Id != id))
+                    return ResponseHelper.Conflict("Já existe outro usuário com este e-mail.", new { req.Email });
 
-            if (await context.Users.AnyAsync(u => u.Name == req.Name && u.Id != id))
-                return Results.BadRequest(new { Error = "Já existe outro usuário com este nome." });
+                if (await context.Users.AnyAsync(u => u.Name == req.Name && u.Id != id))
+                    return ResponseHelper.Conflict("Já existe outro usuário com este nome.", new { req.Name });
 
-            user.Name = req.Name;
-            user.Email = req.Email;
-            user.Role = req.Role;
-            user.Active = true;
+                user.Name = req.Name;
+                user.Email = req.Email;
+                user.Role = req.Role;
+                user.Active = true;
 
-            if (!string.IsNullOrWhiteSpace(req.Password))
-                user.Password = hasher.HashPassword(user, req.Password);
+                if (!string.IsNullOrWhiteSpace(req.Password))
+                    user.Password = hasher.HashPassword(user, req.Password);
 
-            await context.SaveChangesAsync();
+                await context.SaveChangesAsync();
 
-            return Results.Ok(new {
-                user.Id,
-                user.Name,
-                user.Email,
-                user.Role,
-                user.Active,
-                user.CreateDate
-            });
+                return ResponseHelper.Ok(new
+                {
+                    user.Id,
+                    user.Name,
+                    user.Email,
+                    user.Role,
+                    user.Active,
+                    user.CreateDate
+                }, "Usuário atualizado com sucesso.");
+            }
+            catch (Exception ex)
+            {
+                return ResponseHelper.ServerError(ex.Message);
+            }
         });
-
 
         route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
         {
-            var user = await context.Users.FirstOrDefaultAsync(u => u.Id == id);
-            if (user == null) return Results.NotFound();
+            try
+            {
+                var user = await context.Users.FirstOrDefaultAsync(u => u.Id == id);
+                if (user == null)
+                    return ResponseHelper.NotFound("Usuário não encontrado.", new { Id = id });
 
-            user.Active = false;
-            await context.SaveChangesAsync();
-            return Results.Ok(new { Message = "Usuário desativado com sucesso." });
+                user.Active = false;
+                await context.SaveChangesAsync();
+                return ResponseHelper.Ok(new { user.Id, user.Email }, "Usuário desativado com sucesso.");
+            }
+            catch (Exception ex)
+            {
+                return ResponseHelper.ServerError(ex.Message);
+            }
         });
     }
 }

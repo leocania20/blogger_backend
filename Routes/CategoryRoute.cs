@@ -15,74 +15,185 @@ public static class CategoryRoute
         {
             var error = ValidationHelper.ValidateModel(req);
             if (error.Any())
-                return Results.BadRequest(new { Errors = error });
+                return ResponseHelper.BadRequest(
+                    "Os dados enviados são inválidos.",
+                    error,
+                    new
+                    {
+                        name = "Tecnologia",
+                        description = "Categoria relacionada a artigos sobre tecnologia.",
+                        tag = "tech",
+                        active = true
+                    }
+                );
 
             bool exist = await context.Categories.AnyAsync(c =>
                 c.Active &&
                 (c.Name.ToLower() == req.Name.ToLower() ||
-                    c.Tag.ToLower() == req.Tag.ToLower()));
+                 c.Tag.ToLower() == req.Tag.ToLower()));
 
             if (exist)
-                return Results.BadRequest(new { Message = "Já existe uma categoria com este nome ou tag." });
+                return ResponseHelper.Conflict(
+                    "Já existe uma categoria com este nome ou tag.",
+                    new
+                    {
+                        name = "Inovação",
+                        description = "Artigos sobre novas tendências.",
+                        tag = "innovation",
+                        active = true
+                    }
+                );
 
             var category = new CategoryModel
             {
-                Name = req.Name,
-                Description = req.Description,
-                Tag = req.Tag,
+                Name = req.Name.Trim(),
+                Description = req.Description?.Trim(),
+                Tag = req.Tag.Trim().ToLower(),
                 Active = req.Active
             };
 
-            await context.Categories.AddAsync(category);
-            await context.SaveChangesAsync();
+            try
+            {
+                await context.Categories.AddAsync(category);
+                await context.SaveChangesAsync();
 
-            return Results.Created($"/category/{category.Id}", category);
+                return ResponseHelper.Created($"/category/{category.Id}", new
+                {
+                    category.Id,
+                    category.Name,
+                    category.Description,
+                    category.Tag,
+                    category.Active
+                }, "Categoria criada com sucesso.");
+            }
+            catch (Exception ex)
+            {
+                return ResponseHelper.ServerError($"Erro ao criar categoria: {ex.Message}");
+            }
         });
 
         route.MapPut("/{id:int}/update", async (int id, CategoryRequest req, AppDbContext context) =>
         {
             var category = await context.Categories.FirstOrDefaultAsync(c => c.Id == id && c.Active);
             if (category == null)
-                return Results.NotFound(new { Message = "Categoria não encontrada." });
+                return ResponseHelper.NotFound(
+                    $"Categoria com ID {id} não encontrada.",
+                    new
+                    {
+                        id = 1,
+                        name = "Educação",
+                        description = "Conteúdos sobre ensino e formação.",
+                        tag = "education",
+                        active = true
+                    }
+                );
 
-            var error = ValidationHelper.ValidateModel(req);
-            if (error.Any())
-                return Results.BadRequest(new { Errors = error });
+            var errors = ValidationHelper.ValidateModel(req);
+            if (errors.Any())
+                return ResponseHelper.BadRequest(
+                    "Os dados enviados são inválidos.",
+                    errors,
+                    new
+                    {
+                        name = "Negócios",
+                        description = "Artigos sobre gestão e finanças.",
+                        tag = "business",
+                        active = true
+                    }
+                );
 
-            bool again = await context.Categories.AnyAsync(c =>
+            bool duplicate = await context.Categories.AnyAsync(c =>
                 c.Id != id &&
                 c.Active &&
                 (c.Name.ToLower() == req.Name.ToLower() ||
-                    c.Tag.ToLower() == req.Tag.ToLower()));
+                 c.Tag.ToLower() == req.Tag.ToLower()));
 
-            if (again)
-                return Results.BadRequest(new { Message = "Já existe outra categoria com o mesmo nome ou tag." });
+            if (duplicate)
+                return ResponseHelper.Conflict(
+                    "Já existe outra categoria com o mesmo nome ou tag.",
+                    new
+                    {
+                        name = "Saúde",
+                        description = "Categoria de artigos sobre bem-estar e medicina.",
+                        tag = "health",
+                        active = true
+                    }
+                );
 
-            category.Name = req.Name;
-            category.Description = req.Description;
-            category.Tag = req.Tag;
+            category.Name = req.Name.Trim();
+            category.Description = req.Description?.Trim();
+            category.Tag = req.Tag.Trim().ToLower();
             category.Active = req.Active;
 
-            await context.SaveChangesAsync();
-            return Results.Ok(category);
+            try
+            {
+                await context.SaveChangesAsync();
+
+                return ResponseHelper.Ok(new
+                {
+                    category.Id,
+                    category.Name,
+                    category.Description,
+                    category.Tag,
+                    category.Active
+                }, "Categoria atualizada com sucesso.");
+            }
+            catch (Exception ex)
+            {
+                return ResponseHelper.ServerError($"Erro ao atualizar categoria: {ex.Message}");
+            }
         });
-        
+
         route.MapGet("show", async (AppDbContext context) =>
         {
             var categories = await context.Categories
-                                          .Where(c => c.Active)
-                                          .ToListAsync();
-            return Results.Ok(categories);
+                .Where(c => c.Active)
+                .Select(c => new
+                {
+                    c.Id,
+                    c.Name
+                })
+                .ToListAsync();
+
+            if (!categories.Any())
+            {
+                return ResponseHelper.NotFound(
+                    "Nenhuma categoria ativa encontrada.",
+                    new
+                    {
+                        exemplo = "Crie uma nova categoria via POST /category/create"
+                    }
+                );
+            }
+
+            return ResponseHelper.Ok(categories, "Lista de categorias ativas.");
         });
 
         route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
         {
             var category = await context.Categories.FirstOrDefaultAsync(c => c.Id == id && c.Active);
-            if (category == null) return Results.NotFound();
+            if (category == null)
+                return ResponseHelper.NotFound(
+                    $"Categoria com ID {id} não encontrada.",
+                    new { id = 1 }
+                );
 
-            category.Active = false; 
-            await context.SaveChangesAsync();
-            return Results.Ok();
+            category.Active = false;
+
+            try
+            {
+                await context.SaveChangesAsync();
+                return ResponseHelper.Ok(new
+                {
+                    category.Id,
+                    category.Name,
+                    category.Tag
+                }, "Categoria desativada com sucesso.");
+            }
+            catch (Exception ex)
+            {
+                return ResponseHelper.ServerError($"Erro ao desativar categoria: {ex.Message}");
+            }
         });
     }
 }
