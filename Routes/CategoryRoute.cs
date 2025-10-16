@@ -70,7 +70,7 @@ public static class CategoryRoute
             {
                 return ResponseHelper.ServerError($"Erro ao criar categoria: {ex.Message}");
             }
-        }).WithSummary("Criar Categoria");
+        }).WithSummary("Cadastra Categorias");
 
         route.MapPut("/{id:int}/update", async (int id, CategoryRequest req, AppDbContext context) =>
         {
@@ -142,7 +142,7 @@ public static class CategoryRoute
             {
                 return ResponseHelper.ServerError($"Erro ao atualizar categoria: {ex.Message}");
             }
-        }).WithSummary("Atualizar Categoria pelo ID");
+        }).WithSummary("Atualiza uma Categoria pelo ID");
 
         route.MapGet("show", async (AppDbContext context) =>
         {
@@ -167,7 +167,7 @@ public static class CategoryRoute
             }
 
             return ResponseHelper.Ok(categories, "Lista de categorias ativas.");
-        }).WithSummary("Visualizar Categorias Ativas");
+        }).WithSummary("Visualiza Categorias Ativas");
 
         route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
         {
@@ -194,6 +194,6 @@ public static class CategoryRoute
             {
                 return ResponseHelper.ServerError($"Erro ao desativar categoria: {ex.Message}");
             }
-        }).WithSummary("Desativar Categoria pelo ID");
+        }).WithSummary("Deleta uma Categoria pelo ID");
     }
 }

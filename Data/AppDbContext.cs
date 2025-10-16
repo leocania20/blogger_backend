@@ -18,6 +18,8 @@ namespace blogger_backend.Data
         public DbSet<NewsletterModel> Newsletters { get; set; } = null!;
         public DbSet<NotificationModel> Notifications { get; set; } = null!;
         public DbSet<CustomizedResearchModel> CustomizedResearches { get; set; } = null!;
+        public DbSet<AccessLogModel> AccessLogs { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

@@ -70,7 +70,7 @@ public static class FonteRoute
             {
                 return ResponseHelper.ServerError($"Erro ao criar fonte: {ex.Message}");
             }
-        }).WithSummary("Criar Fonte");
+        }).WithSummary("Cadastra Fontes");
 
         route.MapPut("/{id:int}/update", async (int id, SourceRequest req, AppDbContext context) =>
         {
@@ -131,7 +131,7 @@ public static class FonteRoute
             {
                 return ResponseHelper.ServerError($"Erro ao atualizar fonte: {ex.Message}");
             }
-        }).WithSummary("Atualizar Fonte pelo ID");
+        }).WithSummary("Atualiza Fonte pelo ID");
 
         route.MapGet("show", async (AppDbContext context) =>
         {
@@ -157,7 +157,7 @@ public static class FonteRoute
             {
                 return ResponseHelper.ServerError($"Erro ao obter lista de fontes: {ex.Message}");
             }
-        }).WithSummary("Visualizar Fontes Ativas");
+        }).WithSummary("Visualiza Fontes Ativas");
 
         route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
         {
@@ -185,6 +185,6 @@ public static class FonteRoute
             {
                 return ResponseHelper.ServerError($"Erro ao desativar fonte: {ex.Message}");
             }
-        }).WithSummary("Desativar Fonte pelo ID");
+        }).WithSummary("Deleta Fonte pelo ID");
     }
 }

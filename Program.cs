@@ -7,6 +7,8 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Identity;
 using System.Text;
 using Microsoft.OpenApi.Models;
+using blogger_backend.Middlewares;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -103,7 +105,14 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("Admin", policy =>
+        policy.RequireClaim(ClaimTypes.Role, "admin"));
+
+    options.AddPolicy("Painel do Admin", policy =>
+        policy.RequireClaim(ClaimTypes.Role, "admin", "SuperAdmin"));
+});
 
 var app = builder.Build();
 
@@ -125,8 +134,10 @@ app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseStaticFiles(); 
+app.UseMiddleware<AccessLogMiddleware>();
 
 app.UserRoutes(builder.Configuration);
+app.MonitoringRoutes();
 app.ArticlesRoutes();
 app.AuthorRoutes();
 app.CategoryRoutes();

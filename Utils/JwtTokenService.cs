@@ -19,7 +19,8 @@ namespace blogger_backend.Utils
                     new Claim(ClaimTypes.Name, username),
                     new Claim(ClaimTypes.Role, role),
                     new Claim("id", usuarioId.ToString()),
-                    new Claim ("name", name)
+                    new Claim ("name", name),
+                 
                 ]),
                 Expires = DateTime.UtcNow.AddHours(2),
                 SigningCredentials = new SigningCredentials(
