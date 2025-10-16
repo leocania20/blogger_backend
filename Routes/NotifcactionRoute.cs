@@ -28,7 +28,7 @@ public static class notificationRoute
             await context.Notifications.AddAsync(notification);
             await context.SaveChangesAsync();
             return Results.Created($"/notification/{notification.Id}", notification);
-        });
+        }).WithSummary("Criar Notificação");
 
         route.MapGet("show", async (AppDbContext context) =>
         {
@@ -59,7 +59,8 @@ public static class notificationRoute
             .ToListAsync();
 
             return Results.Ok(notifications);
-        });
+        }).WithSummary("Visualizar Notificações Ativas");
+
         route.MapGet("/my-notifications", async (HttpContext http, AppDbContext context) =>
         {
             var userId = http.User.FindFirstValue("id");
@@ -92,7 +93,8 @@ public static class notificationRoute
                 .ToListAsync();
 
             return Results.Ok(notifications);
-        }).RequireAuthorization();
+        }).WithSummary("Visualizar Notificações Ativas do Usuário Logado")
+          .RequireAuthorization();
 
 
         route.MapPut("/{id:int}/update", async (int id, NotificationRequest req, AppDbContext context) =>
@@ -107,16 +109,17 @@ public static class notificationRoute
 
             await context.SaveChangesAsync();
             return Results.Ok(notification);
-        });
+        }).WithSummary("Atualizar Notificação pelo ID");
 
         route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
         {
             var notification = await context.Notifications.FirstOrDefaultAsync(n => n.Id == id && n.Active);
             if (notification == null) return Results.NotFound();
 
-            notification.Active = false; 
+            notification.Active = false;
             await context.SaveChangesAsync();
             return Results.Ok();
-        });
+        }).WithSummary("Desativar Notificação pelo ID")
+            .RequireAuthorization();
     }
 }

@@ -91,7 +91,8 @@ namespace blogger_backend.Routes
                 {
                     return ResponseHelper.ServerError($"Erro inesperado: {ex.Message}");
                 }
-            }).AllowAnonymous();
+            }).WithSummary("Cadastra um novo artigo")
+              .AllowAnonymous();
 
             route.MapPut("/{id:int}/update", async (int id, ArticleRequest req, AppDbContext context, IConfiguration config) =>
             {
@@ -179,7 +180,8 @@ namespace blogger_backend.Routes
                 {
                     return ResponseHelper.ServerError($"Erro inesperado: {ex.Message}");
                 }
-            });
+            }).WithSummary("Actualiza um artigo existente")
+              .AllowAnonymous();
 
             route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
             {
@@ -203,7 +205,8 @@ namespace blogger_backend.Routes
                 {
                     return ResponseHelper.ServerError($"Erro ao desativar artigo: {ex.Message}");
                 }
-            });
+            }).WithSummary("Deletar um artigo pelo ID")
+              .AllowAnonymous();
 
             route.MapGet("show-complet", async (int? id, AppDbContext context) =>
             {
@@ -216,7 +219,8 @@ namespace blogger_backend.Routes
                 {
                     return ResponseHelper.ServerError($"Erro ao buscar artigo: {ex.Message}");
                 }
-            }).AllowAnonymous();
+            }).WithSummary("Visualizar os dados compleoto dos artigo pelo ID(pagina inteira do artigo)")
+              .AllowAnonymous();
 
             route.MapGet("/show-short", async (int? page, AppDbContext context) =>
             {
@@ -229,7 +233,9 @@ namespace blogger_backend.Routes
                 {
                     return ResponseHelper.ServerError($"Erro ao buscar artigos: {ex.Message}");
                 }
-            }).AllowAnonymous();
+            }).WithSummary("Visualizar artigos de forma resumida(página inicial)")
+              .AllowAnonymous();
+
 
             route.MapGet("search", async (
                 string? title,
@@ -237,28 +243,134 @@ namespace blogger_backend.Routes
                 [FromQuery] int[]? sources,
                 DateTime? date,
                 int? page,
-                AppDbContext context) =>
+                AppDbContext context
+            ) =>
             {
                 try
                 {
+                    bool noParams = string.IsNullOrWhiteSpace(title)
+                                    && (categories == null || categories.Length == 0)
+                                    && (sources == null || sources.Length == 0)
+                                    && !date.HasValue;
+
+                    if (noParams)
+                    {
+                        return ResponseHelper.BadRequest(
+                            "Deves informar pelo menos um parâmetro de pesquisa (title, category, source ou date).",
+                            null,
+                            new
+                            {
+                                Exemplo = new
+                                {
+                                    title = "tecnologia",
+                                    categories = new[] { 1, 3 },
+                                    sources = new[] { 2, 5 },
+                                    date = "2025-10-14"
+                                }
+                            }
+                        );
+                    }
                     var result = await HelpGetArticle.GetArticle(
-                        context,
-                        page ?? 1,
-                        6,
-                        null,
-                        title,
-                        categories?.ToList() ?? new(),
-                        null,
-                        sources?.ToList() ?? new(),
-                        date
-                    );
-                    return ResponseHelper.Ok(result);
+                context,
+                currentPage: page ?? 1,
+                pageSize: 6,
+                id: null,
+                title: string.IsNullOrWhiteSpace(title) ? null : title,
+                categoriesIds: categories != null && categories.Length > 0 ? categories.ToList() : null,
+                authorsIds: null,
+                sourcesIds: sources != null && sources.Length > 0 ? sources.ToList() : null,
+                date: date
+            );
+
+
+                    return ResponseHelper.Ok(result, "Pesquisa realizada com sucesso.");
                 }
                 catch (Exception ex)
                 {
                     return ResponseHelper.ServerError($"Erro ao buscar artigos: {ex.Message}");
                 }
-            }).AllowAnonymous();
+            }).WithSummary("Pesquisar artigos por título, categorias, fontes ou data(sem usuário logado)")
+              .AllowAnonymous();
+
+            route.MapGet("/show-user", async (
+                HttpContext http,
+                AppDbContext context,
+                int? page
+            ) =>
+            {
+                try
+                {
+                    var userId = http.User.FindFirst("id")?.Value;
+                    if (string.IsNullOrEmpty(userId))
+                        return ResponseHelper.BadRequest("Usuário não autenticado.", null, new { Exemplo = new { Token = "Bearer seu_token_aqui" } });
+
+                    int usersId = int.Parse(userId);
+
+                    var preferences = await context.CustomizedResearches
+                        .Where(p => p.UserId == usersId)
+                        .ToListAsync();
+
+                    if (preferences == null || preferences.Count == 0)
+                    {
+                        return ResponseHelper.Ok(new
+                        {
+                            page = 1,
+                            pageSize = 6,
+                            total = 0,
+                            totalPages = 0,
+                            articles = new List<object>()
+                        }, "Nenhuma preferência encontrada para o usuário. Nenhum artigo disponível.");
+                    }
+
+                    var categoryIds = preferences.Where(p => p.CategoryId.HasValue).Select(p => p.CategoryId!.Value).Distinct().ToList();
+                    var authorIds = preferences.Where(p => p.AuthorId.HasValue).Select(p => p.AuthorId!.Value).Distinct().ToList();
+                    var sourceIds = preferences.Where(p => p.SourceId.HasValue).Select(p => p.SourceId!.Value).Distinct().ToList();
+
+                    var result = await HelpGetArticle.GetArticle(
+                        context,
+                        currentPage: page ?? 1,
+                        pageSize: 6,
+                        id: null,
+                        title: null,
+                        categoriesIds: categoryIds,
+                        authorsIds: authorIds,
+                        sourcesIds: sourceIds,
+                        date: null
+                    );
+                    dynamic dyn = result;
+                    IEnumerable<object>? articles = null;
+
+                    try
+                    {
+                        articles = (IEnumerable<object>?)dyn.articles;
+                    }
+                    catch
+                    {
+                        try { articles = (IEnumerable<object>?)dyn.Articles; } catch { articles = null; }
+                    }
+
+                    if (articles == null || !articles.Any())
+                    {
+                        return ResponseHelper.Ok(new
+                        {
+                            page = page ?? 1,
+                            pageSize = 6,
+                            total = 0,
+                            totalPages = 0,
+                            articles = new List<object>()
+                        }, "Nenhum artigo encontrado com base nas preferências do usuário.");
+                    }
+                    return ResponseHelper.Ok(result, "Artigos recomendados com base nas preferências do usuário.");
+                }
+                catch (Exception ex)
+                {
+                    return ResponseHelper.ServerError($"Erro ao buscar artigos personalizados: {ex.Message}");
+                }
+            })
+            .WithSummary("Visualizar artigos do usuário logado")
+            .WithDescription("Retorna artigos de acordo as configurações-preferências(categorias, autores e fontes).");
+            
+
         }
     }
 }

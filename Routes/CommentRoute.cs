@@ -31,7 +31,7 @@ public static class ComentarioRoute
             await context.SaveChangesAsync();
 
             return Results.Created($"/comment/{comment.Id}", comment);
-        });
+        }).WithSummary("Criar Comentário");
 
         route.MapPut("/{id:int}/update", async (int id, CommentRequest req, AppDbContext context) =>
         {
@@ -51,17 +51,35 @@ public static class ComentarioRoute
 
             await context.SaveChangesAsync();
             return Results.Ok(comment);
-        });
+        }).WithSummary("Atualizar Comentário pelo ID");
 
         route.MapGet("show", async (AppDbContext context) =>
         {
             var comments = await context.Comments
-                                           .Where(c => c.Active)
-                                           .Include(c => c.User)
-                                           .Include(c => c.Article)
-                                           .ToListAsync();
+                .Where(c => c.Active)
+                .Include(c => c.User)
+                .Include(c => c.Article)
+                .Select(c => new
+                {
+                    c.Id,
+                    c.Text,
+                    c.CreateDate,
+                    User = new
+                    {
+                        c.User.Id,
+                        c.User.Name
+                    },
+                    Article = new
+                    {
+                        c.Article.Id,
+                        c.Article.Title
+                    }
+                })
+                .ToListAsync();
+
             return Results.Ok(comments);
         });
+
 
         route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
         {
@@ -71,6 +89,6 @@ public static class ComentarioRoute
             comment.Active = false; 
             await context.SaveChangesAsync();
             return Results.Ok();
-        });
+        }).WithSummary("Desativar Comentário pelo ID");
     }
 }
