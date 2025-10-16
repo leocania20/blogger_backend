@@ -72,7 +72,7 @@ public static class AutorRoute
             {
                 return ResponseHelper.ServerError($"Erro ao criar autor: {ex.Message}");
             }
-        });
+        }).WithSummary("Cria um novo autor"). Produces(400);
 
         route.MapPut("/{id:int}/update", async (int id, AuthorRequest req, AppDbContext context) =>
         {
@@ -145,7 +145,7 @@ public static class AutorRoute
             {
                 return ResponseHelper.ServerError($"Erro ao atualizar autor: {ex.Message}");
             }
-        });
+        }).WithSummary("Atualiza um autor existente pelo ID");
 
         route.MapGet("show", async (AppDbContext context) =>
         {
@@ -170,7 +170,7 @@ public static class AutorRoute
             }
 
             return ResponseHelper.Ok(autores, "Lista de autores ativos.");
-        });
+        }).WithSummary("Visualizar todos os autores ativos");
 
         route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
         {
@@ -178,7 +178,10 @@ public static class AutorRoute
             if (author == null)
                 return ResponseHelper.NotFound(
                     $"Autor com ID {id} não encontrado.",
-                    new { id = 1 }
+                    new
+                    {
+                        id = 1
+                    }
                 );
 
             author.Active = false;
@@ -197,6 +200,9 @@ public static class AutorRoute
             {
                 return ResponseHelper.ServerError($"Erro ao desativar autor: {ex.Message}");
             }
-        });
+        }).WithSummary("Desativa um autor pelo ID");
+
+        
+
     }
 }

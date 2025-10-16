@@ -1,12 +1,8 @@
 
--- =========================================
--- 🚀 POPULAR TABELAS BASE (Render / PostgreSQL)
--- =========================================
 
 SET search_path TO public;
 
 
--- 1️⃣ Inserir Categorias
 INSERT INTO "Categories" ("Id", "Name", "Description" ,"Tag", "Active") VALUES
 (1, 'Tecnologia', 'Notícias sobre inovações tecnológicas', 'tech', true),
 (2, 'Economia', 'Tópicos sobre o mercado financeiro e negócios', 'economy', true),
@@ -19,7 +15,6 @@ INSERT INTO "Categories" ("Id", "Name", "Description" ,"Tag", "Active") VALUES
 (9, 'Cultura', 'Artes, literatura e cinema', 'culture', true),
 (10, 'Tecnologia da Informação', 'Soluções digitais e sistemas', 'it', true);
 
--- 2️⃣ Inserir Fontes (Sources)
 INSERT INTO "Sources" ("Id", "Name", "URL", "Type", "Active") VALUES
 (1, 'BBC News', 'https://www.bbc.com', 'Internacional', true),
 (2, 'CNN', 'https://www.cnn.com', 'Internacional', true),
@@ -32,7 +27,6 @@ INSERT INTO "Sources" ("Id", "Name", "URL", "Type", "Active") VALUES
 (9, 'The Guardian', 'https://www.theguardian.com', 'Internacional', true),
 (10, 'Google News', 'https://news.google.com', 'Agregador', true);
 
--- 3️⃣ Inserir Autores
 INSERT INTO "Authores" ("Id", "Name", "Bio", "Email", "UserId", "Active") VALUES
 (1, 'Leocânia Melo', 'Engenheiro Informático apaixonado por IA e automação.', 'leocania@blogger.com',1, true),
 (2, 'Avelino Silvano', 'Jornalista com foco em tecnologia e inovação.', 'avelino@blogger.com', 2, true),
@@ -40,7 +34,7 @@ INSERT INTO "Authores" ("Id", "Name", "Bio", "Email", "UserId", "Active") VALUES
 (4, 'Carlos Tavares', 'Pesquisador em ciências ambientais.', 'carlos@blogger.com',4,  true),
 (5, 'Ana Luísa', 'Escritora e analista de cultura.', 'ana@blogger.com', 5, true);
 
--- 4️⃣ Inserir Pesquisas Personalizadas
+
 INSERT INTO "CustomizedResearches" ("Id", "UserId", "CategoryId", "AuthorId", "SourceId", "CreateDate") VALUES
 (1, 1, 1, 2, 5, NOW()),
 (2, 1, 3, 4, 6, NOW()),
@@ -53,7 +47,6 @@ INSERT INTO "CustomizedResearches" ("Id", "UserId", "CategoryId", "AuthorId", "S
 (9, 5, 8, 4, 7, NOW()),
 (10, 5, 6, 2, 10, NOW());
 
--- 5️⃣ Inserir Artigos
 INSERT INTO "Articles" ("Id", "Title", "Tag", "Text", "Summary", "CreateDate", "UpDate", "PublishedDate", "IsPublished", "Imagem", "CategoryId", "AuthorId", "SourceId")
 VALUES
 (1, 'A Revolução da IA na Educação', 'ai-edu', 'A inteligência artificial está transformando o ensino em todo o mundo...', 'Como a IA está mudando a educação.', NOW(), NULL, NOW(), true, 'https://blogger-backend-6.onrender.com//uploads/artigos/5bd876af1daad6b3965689200d2f9f55d68ec739.jpg', 4, 1, 5),
@@ -68,14 +61,11 @@ VALUES
 (10, 'Mudanças Climáticas e Energia Sustentável', 'clima', 'Como o aquecimento global afeta o futuro da energia...', 'Soluções verdes em pauta.', NOW(), NULL, NOW(), true, 'https://blogger-backend-6.onrender.com//uploads/artigos/d0a39c40120c2c0e4754d627c83b9333f7aa2a74.jpg', 6, 4, 7);
 
 
--- ==============================
--- 🚀 Função: cria notificações automáticas ao cadastrar artigo
--- ==============================
 
 CREATE OR REPLACE FUNCTION fn_notify_users_on_new_article()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Apenas cria notificação se o artigo estiver publicado
+
     IF NEW."IsPublished" = TRUE THEN
         INSERT INTO "Notifications" (
             "Title",

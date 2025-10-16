@@ -56,7 +56,7 @@ public static class UserRoute
             {
                 return ResponseHelper.ServerError(ex.Message);
             }
-        });
+        }).WithSummary("Registrar Usuário");
 
 
         route.MapPost("/signin", async (
@@ -83,7 +83,7 @@ public static class UserRoute
             {
                 return ResponseHelper.ServerError(ex.Message);
             }
-        });
+        }).WithSummary("Login de Usuário");
 
         route.MapGet("/profile", [Authorize] (HttpContext http) =>
         {
@@ -106,7 +106,7 @@ public static class UserRoute
             {
                 return ResponseHelper.ServerError(ex.Message);
             }
-        });
+        }).WithSummary("Obter Perfil do Usuário Logado");
 
         route.MapGet("show", async (AppDbContext context) =>
         {
@@ -129,7 +129,7 @@ public static class UserRoute
             {
                 return ResponseHelper.ServerError(ex.Message);
             }
-        });
+        }).WithSummary("Visualizar Usuários Ativos");
 
         route.MapPut("/{id:int}/update", async (int id, UserRequest req, AppDbContext context, IPasswordHasher<UserModel> hasher) =>
         {
@@ -173,7 +173,7 @@ public static class UserRoute
             {
                 return ResponseHelper.ServerError(ex.Message);
             }
-        });
+        }).WithSummary("Atualizar Usuário pelo ID");
 
         route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
         {
@@ -191,6 +191,6 @@ public static class UserRoute
             {
                 return ResponseHelper.ServerError(ex.Message);
             }
-        });
+        }).WithSummary("Desativar Usuário pelo ID");
     }
 }
