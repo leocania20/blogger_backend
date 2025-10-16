@@ -123,9 +123,8 @@ public static class CustomizedResearchRoute
             {
                 return ResponseHelper.ServerError(ex.Message);
             }
-        }).WithSummary("Adicionar ou atualizar preferências personalizadas de pesquisa")
-          .WithDescription("Adiciona ou atualiza as preferências personalizadas de pesquisa do usuário. " +
-                           "Permite adicionar categorias, autores e fontes específicas para personalizar a pesquisa.");
+        }).WithSummary("Cadastra ou Actualiza preferências personalizadas do usuário")
+          .WithDescription("Permite adicionar categorias, autores e fontes específicas para personalizar a pesquisa.");
 
         route.MapGet("show", async (HttpContext http, AppDbContext context) =>
         {
@@ -181,8 +180,8 @@ public static class CustomizedResearchRoute
             {
                 return ResponseHelper.ServerError(ex.Message);
             }
-        }).WithSummary("Obter preferências personalizadas do Usuário Logado")
-          .WithDescription("Visualizar as preferências personalizadas do usuário, incluindo categorias, autores e fontes.");
+        }).WithSummary("Visualiza preferências personalizadas do Usuário Logado")
+          .WithDescription("Visualiza as preferências personalizadas do usuário, incluindo categorias, autores e fontes.");
         
         route.MapDelete("delete", async ([FromQuery] int? categoryId, [FromQuery] int? authorId, [FromQuery] int? sourceId, HttpContext http, AppDbContext context) =>
         {
@@ -226,6 +225,6 @@ public static class CustomizedResearchRoute
             {
                 return ResponseHelper.ServerError(ex.Message);
             }
-        }).WithSummary("Deletar preferências personalizadas do usuário logado");
+        }).WithSummary("Deleta preferências personalizadas do usuário logado");
     }
 }

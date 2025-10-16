@@ -91,7 +91,7 @@ namespace blogger_backend.Routes
                 {
                     return ResponseHelper.ServerError($"Erro inesperado: {ex.Message}");
                 }
-            }).WithSummary("Cadastra um novo artigo")
+            }).WithSummary("Cadastra Artigos")
               .AllowAnonymous();
 
             route.MapPut("/{id:int}/update", async (int id, ArticleRequest req, AppDbContext context, IConfiguration config) =>
@@ -180,7 +180,7 @@ namespace blogger_backend.Routes
                 {
                     return ResponseHelper.ServerError($"Erro inesperado: {ex.Message}");
                 }
-            }).WithSummary("Actualiza um artigo existente")
+            }).WithSummary("Actualiza um Artigo existente")
               .AllowAnonymous();
 
             route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
@@ -205,7 +205,7 @@ namespace blogger_backend.Routes
                 {
                     return ResponseHelper.ServerError($"Erro ao desativar artigo: {ex.Message}");
                 }
-            }).WithSummary("Deletar um artigo pelo ID")
+            }).WithSummary("Deleta um Artigo pelo ID")
               .AllowAnonymous();
 
             route.MapGet("show-complet", async (int? id, AppDbContext context) =>
@@ -219,7 +219,7 @@ namespace blogger_backend.Routes
                 {
                     return ResponseHelper.ServerError($"Erro ao buscar artigo: {ex.Message}");
                 }
-            }).WithSummary("Visualizar os dados compleoto dos artigo pelo ID(pagina inteira do artigo)")
+            }).WithSummary("Visualiza os dados compleoto dos artigo pelo ID(pagina inteira do artigo)")
               .AllowAnonymous();
 
             route.MapGet("/show-short", async (int? page, AppDbContext context) =>
@@ -289,7 +289,7 @@ namespace blogger_backend.Routes
                 {
                     return ResponseHelper.ServerError($"Erro ao buscar artigos: {ex.Message}");
                 }
-            }).WithSummary("Pesquisar artigos por título, categorias, fontes ou data(sem usuário logado)")
+            }).WithSummary("Pesquisa e Visualiza Artigos por título, categorias, fontes ou data(sem usuário logado)")
               .AllowAnonymous();
 
             route.MapGet("/show-user", async (
@@ -367,9 +367,51 @@ namespace blogger_backend.Routes
                     return ResponseHelper.ServerError($"Erro ao buscar artigos personalizados: {ex.Message}");
                 }
             })
-            .WithSummary("Visualizar artigos do usuário logado")
+            .WithSummary("Visualiza os Artigos do Usuário logado")
             .WithDescription("Retorna artigos de acordo as configurações-preferências(categorias, autores e fontes).");
-            
+
+            route.MapGet("/suggest", async (string? query, AppDbContext context) =>
+            {
+                try
+                {
+                    if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
+                    {
+                        return Results.BadRequest(new
+                        {
+                            success = false,
+                            message = "Informe pelo menos 2 caracteres para fazer a sugestão.",
+                            example = new { query = "tec" }
+                        });
+                    }
+
+                    var suggestions = await context.Articles
+                        .Where(a => a.IsPublished && a.Title.ToLower().Contains(query.ToLower()))
+                        .OrderBy(a => a.Title)
+                        .Select(a => a.Title)
+                        .Distinct()
+                        .Take(10)
+                        .ToListAsync();
+
+                    if (!suggestions.Any())
+                    {
+                        return ResponseHelper.Ok(new List<string>(), "Nenhuma sugestão encontrada.");
+                    }
+
+                    return ResponseHelper.Ok(new
+                    {
+                        total = suggestions.Count,
+                        suggestions
+                    }, "Sugestões obtidas com sucesso.");
+                }
+                catch (Exception ex)
+                {
+                    return ResponseHelper.ServerError($"Erro ao buscar sugestões: {ex.Message}");
+                }
+            })
+            .WithSummary("Pesquisa automática de títulos de artigos")
+            .WithDescription("Retorna até 10 sugestões de títulos que contêm o texto digitado.")
+            .AllowAnonymous();
+                        
 
         }
     }

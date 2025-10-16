@@ -89,6 +89,6 @@ public static class ComentarioRoute
             comment.Active = false; 
             await context.SaveChangesAsync();
             return Results.Ok();
-        }).WithSummary("Desativar Comentário pelo ID");
+        }).WithSummary("deleta Comentário pelo ID");
     }
 }

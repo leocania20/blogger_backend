@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using blogger_backend.Data;
@@ -11,9 +12,11 @@ using blogger_backend.Data;
 namespace blogger_backend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251016083616_AddAccessLogs")]
+    partial class AddAccessLogs
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -33,9 +36,6 @@ namespace blogger_backend.Migrations
                     b.Property<DateTime>("AccessDate")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<double>("DurationMs")
-                        .HasColumnType("double precision");
-
                     b.Property<string>("IpAddress")
                         .IsRequired()
                         .HasColumnType("text");
@@ -49,12 +49,6 @@ namespace blogger_backend.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("UserAgent")
-                        .HasColumnType("text");
-
-                    b.Property<string>("UserId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("UserName")
                         .HasColumnType("text");
 
                     b.HasKey("Id");

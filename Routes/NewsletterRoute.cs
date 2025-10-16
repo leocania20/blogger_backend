@@ -21,7 +21,7 @@ public static class NewsletterRoute
             await context.Newsletters.AddAsync(newsletter);
             await context.SaveChangesAsync();
             return Results.Created($"/newsletter/{newsletter.Id}", newsletter);
-        }).WithSummary("Criar Newsletter");
+        }).WithSummary("Cadastra Newsletter");
 
         route.MapGet("show", async (AppDbContext context) =>
         {
@@ -29,7 +29,7 @@ public static class NewsletterRoute
                                            .Where(n => n.Active)
                                            .ToListAsync();
             return Results.Ok(newsletters);
-        }).WithSummary("Visualizar Newsletters Ativas");
+        }).WithSummary("Visualiza Newsletters Ativas");
 
         route.MapPut("/{id:int}/update", async (int id, NewsletterRequest req, AppDbContext context) =>
         {
@@ -40,7 +40,7 @@ public static class NewsletterRoute
             newsletter.Active = req.Active;
             await context.SaveChangesAsync();
             return Results.Ok(newsletter);
-        }).WithSummary("Atualizar Newsletter pelo ID");
+        }).WithSummary("Atualiza Newsletter pelo ID");
 
         route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
         {
@@ -50,6 +50,6 @@ public static class NewsletterRoute
             newsletter.Active = false;
             await context.SaveChangesAsync();
             return Results.Ok();
-        }).WithSummary("Desativar Newsletter pelo ID");
+        }).WithSummary("Deleta Newsletter pelo ID");
     }
 }
