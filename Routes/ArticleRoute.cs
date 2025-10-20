@@ -3,7 +3,6 @@ using blogger_backend.Models;
 using blogger_backend.Utils;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
 
 namespace blogger_backend.Routes
 {
@@ -411,8 +410,6 @@ namespace blogger_backend.Routes
             .WithSummary("Pesquisa automática de títulos de artigos")
             .WithDescription("Retorna até 10 sugestões de títulos que contêm o texto digitado.")
             .AllowAnonymous();
-                        
-
         }
     }
 }
