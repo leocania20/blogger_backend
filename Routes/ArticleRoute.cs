@@ -235,62 +235,69 @@ namespace blogger_backend.Routes
             }).WithSummary("Visualizar artigos de forma resumida(página inicial)")
               .AllowAnonymous();
 
-
             route.MapGet("search", async (
-                string? title,
-                [FromQuery] int[]? categories,
-                [FromQuery] int[]? sources,
-                DateTime? date,
-                int? page,
-                AppDbContext context
-            ) =>
-            {
-                try
-                {
-                    bool noParams = string.IsNullOrWhiteSpace(title)
-                                    && (categories == null || categories.Length == 0)
-                                    && (sources == null || sources.Length == 0)
-                                    && !date.HasValue;
+    string? title,
+    [FromQuery] int[]? categories,
+    [FromQuery] int[]? sources,
+    DateTime? date,
+    int? page,
+    AppDbContext context
+) =>
+{
+    try
+    {
+        bool noParams = string.IsNullOrWhiteSpace(title)
+                        && (categories == null || categories.Length == 0)
+                        && (sources == null || sources.Length == 0)
+                        && !date.HasValue;
 
-                    if (noParams)
+        if (noParams)
+        {
+            return ResponseHelper.BadRequest(
+                "Deves informar pelo menos um parâmetro de pesquisa (title, category, source ou date).",
+                null,
+                new
+                {
+                    Exemplo = new
                     {
-                        return ResponseHelper.BadRequest(
-                            "Deves informar pelo menos um parâmetro de pesquisa (title, category, source ou date).",
-                            null,
-                            new
-                            {
-                                Exemplo = new
-                                {
-                                    title = "tecnologia",
-                                    categories = new[] { 1, 3 },
-                                    sources = new[] { 2, 5 },
-                                    date = "2025-10-14"
-                                }
-                            }
-                        );
+                        title = "tecnologia",
+                        categories = new[] { 1, 3 },
+                        sources = new[] { 2, 5 },
+                        date = "2025-10-14"
                     }
-                    var result = await HelpGetArticle.GetArticle(
-                context,
-                currentPage: page ?? 1,
-                pageSize: 6,
-                id: null,
-                title: string.IsNullOrWhiteSpace(title) ? null : title,
-                categoriesIds: categories != null && categories.Length > 0 ? categories.ToList() : null,
-                authorsIds: null,
-                sourcesIds: sources != null && sources.Length > 0 ? sources.ToList() : null,
-                date: date
+                }
             );
+        }
 
+        // ✅ Converter data para UTC antes de usar
+        if (date.HasValue)
+        {
+            date = DateTime.SpecifyKind(date.Value, DateTimeKind.Utc);
+        }
 
-                    return ResponseHelper.Ok(result, "Pesquisa realizada com sucesso.");
-                }
-                catch (Exception ex)
-                {
-                    return ResponseHelper.ServerError($"Erro ao buscar artigos: {ex.Message}");
-                }
-            }).WithSummary("Pesquisa e Visualiza Artigos por título, categorias, fontes ou data(sem usuário logado)")
-              .AllowAnonymous();
+        var result = await HelpGetArticle.GetArticle(
+            context,
+            currentPage: page ?? 1,
+            pageSize: 6,
+            id: null,
+            title: string.IsNullOrWhiteSpace(title) ? null : title,
+            categoriesIds: categories != null && categories.Length > 0 ? categories.ToList() : null,
+            authorsIds: null,
+            sourcesIds: sources != null && sources.Length > 0 ? sources.ToList() : null,
+            date: date
+        );
 
+        return ResponseHelper.Ok(result, "Pesquisa realizada com sucesso.");
+    }
+    catch (Exception ex)
+    {
+        return ResponseHelper.ServerError($"Erro ao buscar artigos: {ex.Message}");
+    }
+})
+.WithSummary("Pesquisa e Visualiza Artigos por título, categorias, fontes ou data (sem usuário logado)")
+.AllowAnonymous();
+
+            
             route.MapGet("/show-user", async (
                 HttpContext http,
                 AppDbContext context,

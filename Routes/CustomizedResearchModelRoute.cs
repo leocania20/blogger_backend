@@ -9,7 +9,7 @@ public static class CustomizedResearchRoute
 {
     public static void PesquisaCustomizadaRoutes(this WebApplication app)
     {
-        var route = app.MapGroup("/seetings").WithTags("Seetings").RequireAuthorization();
+        var route = app.MapGroup("/settings").WithTags("Settings").RequireAuthorization();
 
         route.MapPost("/up", async (HttpContext http, List<CustomizedResearchRequest> reqList, AppDbContext context) =>
         {
