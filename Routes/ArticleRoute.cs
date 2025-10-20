@@ -269,7 +269,6 @@ namespace blogger_backend.Routes
             );
         }
 
-        // ✅ Converter data para UTC antes de usar
         if (date.HasValue)
         {
             date = DateTime.SpecifyKind(date.Value, DateTimeKind.Utc);
