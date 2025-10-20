@@ -14,115 +14,111 @@ public static class CustomizedResearchRoute
 
 
        route.MapPost("/up", [Authorize] async (HttpContext http, List<CustomizedResearchBulkRequest> reqList, AppDbContext context) =>
-{
-    try
-    {
-        var userId = http.User.FindFirst("id")?.Value;
-        if (string.IsNullOrEmpty(userId))
-            return ResponseHelper.BadRequest("Usuário não autenticado.", null, new
+       {
+            try
             {
-                Exemplo = new { Token = "Bearer seu_token_aqui" }
-            });
+                var userId = http.User.FindFirst("id")?.Value;
+                if (string.IsNullOrEmpty(userId))
+                    return ResponseHelper.BadRequest("Usuário não autenticado.", null, new
+                    {
+                        Exemplo = new { Token = "Bearer seu_token_aqui" }
+                    });
 
-        if (reqList == null || !reqList.Any())
-            return ResponseHelper.BadRequest("A lista de preferências não pode estar vazia.", null, new
-            {
-                Exemplo = new[]
+                if (reqList == null || !reqList.Any())
+                    return ResponseHelper.BadRequest("A lista de preferências não pode estar vazia.", null, new
+                    {
+                        Exemplo = new[]
+                        {
+                            new { categories = new[] { 1, 2 }, authors = new[] { 3 }, sources = new[] { 4 } }
+                        }
+                    });
+
+                int usersId = int.Parse(userId);
+
+                var savedList = new List<object>();
+                var ignoredList = new List<object>();
+
+                async Task ProcessItems(List<int>? items, string tipo)
                 {
-                    new { categories = new[] { 1, 2 }, authors = new[] { 3 }, sources = new[] { 4 } }
+                    if (items == null || items.Count == 0) return;
+
+                    string tipoLower = tipo.ToLower();
+
+                    foreach (var id in items)
+                    {
+                        bool alreadyExists = await context.CustomizedResearches.AnyAsync(c =>
+                            c.UserId == usersId &&
+                            ((tipoLower == "categoria" && c.CategoryId == id) ||
+                            (tipoLower == "autor" && c.AuthorId == id) ||
+                            (tipoLower == "fonte" && c.SourceId == id)));
+
+                        if (alreadyExists)
+                        {
+                            ignoredList.Add(new { Tipo = tipo, Id = id, Motivo = "Já existe" });
+                            continue;
+                        }
+
+                        bool entityExists = tipoLower switch
+                        {
+                            "categoria" => await context.Categories.AnyAsync(c => c.Id == id),
+                            "autor" => await context.Authores.AnyAsync(a => a.Id == id),
+                            "fonte" => await context.Sources.AnyAsync(s => s.Id == id),
+                            _ => false
+                        };
+
+                        if (!entityExists)
+                        {
+                            ignoredList.Add(new { Tipo = tipo, Id = id, Motivo = "Não existe na base de dados" });
+                            continue;
+                        }
+
+                        var newResearch = new CustomizedResearchModel
+                        {
+                            UserId = usersId,
+                            CategoryId = tipoLower == "categoria" ? id : null,
+                            AuthorId = tipoLower == "autor" ? id : null,
+                            SourceId = tipoLower == "fonte" ? id : null,
+                            CreateDate = DateTime.UtcNow
+                        };
+
+                        await context.CustomizedResearches.AddAsync(newResearch);
+                        await context.SaveChangesAsync();
+
+                        savedList.Add(new
+                        {
+                            newResearch.Id,
+                            newResearch.UserId,
+                            newResearch.CategoryId,
+                            newResearch.AuthorId,
+                            newResearch.SourceId,
+                            newResearch.CreateDate,
+                            Tipo = tipo
+                        });
+                    }
                 }
-            });
 
-        int usersId = int.Parse(userId);
-
-        var savedList = new List<object>();
-        var ignoredList = new List<object>();
-
-        async Task ProcessItems(List<int>? items, string tipo)
-        {
-            if (items == null || items.Count == 0) return;
-
-            string tipoLower = tipo.ToLower();
-
-            foreach (var id in items)
-            {
-                // Verificar se já existe para o mesmo usuário
-                bool alreadyExists = await context.CustomizedResearches.AnyAsync(c =>
-                    c.UserId == usersId &&
-                    ((tipoLower == "categoria" && c.CategoryId == id) ||
-                     (tipoLower == "autor" && c.AuthorId == id) ||
-                     (tipoLower == "fonte" && c.SourceId == id)));
-
-                if (alreadyExists)
+                foreach (var req in reqList)
                 {
-                    ignoredList.Add(new { Tipo = tipo, Id = id, Motivo = "Já existe" });
-                    continue;
+                    await ProcessItems(req.Categories, "Categoria");
+                    await ProcessItems(req.Authors, "Autor");
+                    await ProcessItems(req.Sources, "Fonte");
                 }
 
-                // Verificar se a entidade realmente existe
-                bool entityExists = tipoLower switch
+                return ResponseHelper.Ok(new
                 {
-                    "categoria" => await context.Categories.AnyAsync(c => c.Id == id),
-                    "autor" => await context.Authores.AnyAsync(a => a.Id == id),
-                    "fonte" => await context.Sources.AnyAsync(s => s.Id == id),
-                    _ => false
-                };
-
-                if (!entityExists)
-                {
-                    ignoredList.Add(new { Tipo = tipo, Id = id, Motivo = "Não existe na base de dados" });
-                    continue;
-                }
-
-                // Criar novo registro
-                var newResearch = new CustomizedResearchModel
-                {
-                    UserId = usersId,
-                    CategoryId = tipoLower == "categoria" ? id : null,
-                    AuthorId = tipoLower == "autor" ? id : null,
-                    SourceId = tipoLower == "fonte" ? id : null,
-                    CreateDate = DateTime.UtcNow
-                };
-
-                await context.CustomizedResearches.AddAsync(newResearch);
-                await context.SaveChangesAsync();
-
-                savedList.Add(new
-                {
-                    newResearch.Id,
-                    newResearch.UserId,
-                    newResearch.CategoryId,
-                    newResearch.AuthorId,
-                    newResearch.SourceId,
-                    newResearch.CreateDate,
-                    Tipo = tipo
-                });
+                    adicionados = savedList.Count,
+                    ignorados = ignoredList.Count,
+                    registros_adicionados = savedList,
+                    registros_ignorados = ignoredList
+                }, "Operação concluída com sucesso.");
             }
-        }
-
-        // Iterar sobre cada objeto da lista
-        foreach (var req in reqList)
-        {
-            await ProcessItems(req.Categories, "Categoria");
-            await ProcessItems(req.Authors, "Autor");
-            await ProcessItems(req.Sources, "Fonte");
-        }
-
-        return ResponseHelper.Ok(new
-        {
-            adicionados = savedList.Count,
-            ignorados = ignoredList.Count,
-            registros_adicionados = savedList,
-            registros_ignorados = ignoredList
-        }, "Operação concluída com sucesso.");
-    }
-    catch (Exception ex)
-    {
-        return ResponseHelper.ServerError($"Erro interno: {ex.Message}");
-    }
-})
-.WithSummary("Cadastra múltiplas preferências personalizadas")
-.WithDescription("Permite cadastrar várias categorias, autores e fontes ao mesmo tempo para personalizar o conteúdo do usuário.");
+            catch (Exception ex)
+            {
+                return ResponseHelper.ServerError($"Erro interno: {ex.Message}");
+            }
+        })
+        .WithSummary("Cadastra múltiplas preferências personalizadas")
+        .WithDescription("Permite cadastrar várias categorias, autores e fontes ao mesmo tempo para personalizar o conteúdo do usuário.");
 
 
         route.MapGet("show", async (HttpContext http, AppDbContext context) =>
