@@ -1,6 +1,8 @@
+using System.Security.Claims;
 using blogger_backend.Data;
 using blogger_backend.Models;
 using blogger_backend.Utils;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,79 +21,107 @@ namespace blogger_backend.Routes
                 var baseUrl = config.GetValue<string>("BackendSettings:BaseUrl") ?? "http://localhost:5095";
                 return $"{baseUrl.TrimEnd('/')}/uploads/artigos/{nameImagem}";
             }
+route.MapPost("create", [Authorize] async (HttpContext http, ArticleRequest req, AppDbContext context, IConfiguration config) =>
+{
+    try
+    {
+        // Obtém o ID do usuário autenticado
+        var userIdClaim = http.User.FindFirst("id")?.Value;
+        var userName = http.User.FindFirst("name")?.Value ?? "Usuário Desconhecido";
+        var userEmail = http.User.FindFirst("email")?.Value ?? "sememail@exemplo.com";
 
-            route.MapPost("create", async (ArticleRequest req, AppDbContext context, IConfiguration config) =>
+        if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        // Validação dos dados enviados
+        var error = ValidationHelper.ValidateModel(req);
+        if (error.Any())
+        {
+            return Results.BadRequest(new
             {
-                var error = ValidationHelper.ValidateModel(req);
-                if (error.Any())
-                    return Results.BadRequest(new
-                    {
-                        success = false,
-                        message = "Os dados enviados são inválidos.",
-                        error,
-                        example = new
-                        {
-                            title = "Exemplo de Título",
-                            tag = "educação",
-                            text = "Texto completo do artigo.",
-                            summary = "Resumo breve sobre o artigo.",
-                            isPublished = true,
-                            categoryId = 1,
-                            authorId = 1,
-                            sourceId = 1,
-                            imagem = "exemplo.jpg"
-                        }
-                    });
-
-                var imagemUrl = GetImagem(req.Imagem, config);
-
-                var article = new ArticlesModel
+                success = false,
+                message = "Os dados enviados são inválidos.",
+                error,
+                example = new
                 {
-                    Title = req.Title,
-                    Tag = req.Tag,
-                    Text = req.Text,
-                    Summary = req.Summary,
-                    CreateDate = DateTime.UtcNow,
-                    UpDate = DateTime.UtcNow,
-                    IsPublished = req.IsPublished,
-                    CategoryId = req.CategoryId,
-                    AuthorId = req.AuthorId,
-                    SourceId = req.SourceId,
-                    Imagem = imagemUrl
-                };
-
-                try
-                {
-                    await context.Articles.AddAsync(article);
-                    await context.SaveChangesAsync();
-                    return ResponseHelper.Created($"/articles/{article.Id}", article);
+                    title = "Exemplo de Título",
+                    tag = "educação",
+                    text = "Texto completo do artigo.",
+                    summary = "Resumo breve sobre o artigo.",
+                    isPublished = true,
+                    categoryId = 1,
+                    sourceId = 1,
+                    imagem = "exemplo.jpg"
                 }
-                catch (DbUpdateException)
-                {
-                    return Results.Conflict(new
-                    {
-                        success = false,
-                        message = "Conflito: o artigo pode já existir. Verifique o título ou identificadores.",
-                        example = new
-                        {
-                            title = "Um novo artigo exclusivo",
-                            tag = "animais",
-                            text = "Conteúdo original e sem duplicação.",
-                            summary = "Resumo diferente do existente.",
-                            isPublished = true,
-                            categoryId = 2,
-                            authorId = 1,
-                            sourceId = 1,
-                            imagem = "artigo_novo.jpg"
-                        }
-                    });
-                }
-                catch (Exception ex)
-                {
-                    return ResponseHelper.ServerError($"Erro inesperado: {ex.Message}");
-                }
-            }).WithSummary("Cadastra Artigos")
-              .AllowAnonymous();
+            });
+        }
+
+        var imagemUrl = GetImagem(req.Imagem, config);
+
+        // 🔹 Verifica se o usuário já é autor
+        var author = await context.Authores.FirstOrDefaultAsync(a => a.UserId == userId);
+
+        // 🔹 Se não for, cria automaticamente
+        if (author == null)
+        {
+            author = new AuthorModel
+            {
+                Name = userName,
+                Email = userEmail,
+                Bio = "Autor criado automaticamente.",
+                UserId = userId
+            };
+
+            await context.Authores.AddAsync(author);
+            await context.SaveChangesAsync();
+        }
+
+        // 🔹 Cria o artigo associado ao autor obrigatório
+        var article = new ArticlesModel
+        {
+            Title = req.Title,
+            Tag = req.Tag,
+            Text = req.Text,
+            Summary = req.Summary,
+            CreateDate = DateTime.UtcNow,
+            UpDate = DateTime.UtcNow,
+            IsPublished = req.IsPublished,
+            CategoryId = req.CategoryId,
+            AuthorId = author.Id, // obrigatório e garantido
+            SourceId = req.SourceId,
+            Imagem = imagemUrl
+        };
+
+        await context.Articles.AddAsync(article);
+        await context.SaveChangesAsync();
+
+        return Results.Created($"/articles/{article.Id}", new
+        {
+            success = true,
+            message = "Artigo criado com sucesso.",
+            data = article
+        });
+    }
+    catch (DbUpdateException ex)
+    {
+        Console.WriteLine("Erro BD => " + ex.InnerException?.Message);
+        return Results.Conflict(new
+        {
+            success = false,
+            message = "Conflito ao gravar no banco de dados.",
+            details = ex.InnerException?.Message
+        });
+    }
+    catch (Exception ex)
+    {
+        return ResponseHelper.ServerError($"Erro inesperado: {ex.Message}");
+    }
+})
+.WithSummary("Cadastra Artigos (qualquer usuário autenticado)")
+.WithDescription("Permite que qualquer usuário autenticado crie artigos. Caso o usuário não tenha registro de autor, ele é criado automaticamente e vinculado ao artigo.");
+
 
             route.MapPut("/{id:int}/update", async (int id, ArticleRequest req, AppDbContext context, IConfiguration config) =>
             {

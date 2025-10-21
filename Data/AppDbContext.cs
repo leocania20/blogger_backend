@@ -92,7 +92,13 @@ namespace blogger_backend.Data
                         .WithMany(a => a.Notification)
                         .HasForeignKey(n => n.ArticleId)
                         .IsRequired(false);
-            
+
+            modelBuilder.Entity<AuthorModel>()
+                        .HasOne(a => a.User)
+                        .WithOne()
+                        .HasForeignKey<AuthorModel>(a => a.UserId)
+                        .OnDelete(DeleteBehavior.Cascade);
+                        
             modelBuilder.Entity<CustomizedResearchModel>()
                 .HasIndex(c => new { c.UserId, c.CategoryId })
                 .IsUnique()

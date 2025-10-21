@@ -12,9 +12,8 @@ public static class CustomizedResearchRoute
     {
         var route = app.MapGroup("/settings").WithTags("Settings").RequireAuthorization();
 
-
-       route.MapPost("/up", [Authorize] async (HttpContext http, List<CustomizedResearchBulkRequest> reqList, AppDbContext context) =>
-       {
+        route.MapPost("/up", [Authorize] async (HttpContext http, CustomizedResearchBulkRequest req, AppDbContext context) =>
+        {
             try
             {
                 var userId = http.User.FindFirst("id")?.Value;
@@ -24,17 +23,18 @@ public static class CustomizedResearchRoute
                         Exemplo = new { Token = "Bearer seu_token_aqui" }
                     });
 
-                if (reqList == null || !reqList.Any())
-                    return ResponseHelper.BadRequest("A lista de preferências não pode estar vazia.", null, new
+                if (req == null || (
+                    (req.Categories == null || !req.Categories.Any()) &&
+                    (req.Authors == null || !req.Authors.Any()) &&
+                    (req.Sources == null || !req.Sources.Any())))
+                {
+                    return ResponseHelper.BadRequest("Pelo menos uma lista (categories, authors ou sources) deve ser preenchida.", null, new
                     {
-                        Exemplo = new[]
-                        {
-                            new { categories = new[] { 1, 2 }, authors = new[] { 3 }, sources = new[] { 4 } }
-                        }
+                        Exemplo = new { categories = new[] { 1, 2 }, authors = new[] { 3 }, sources = new[] { 4 } }
                     });
+                }
 
                 int usersId = int.Parse(userId);
-
                 var savedList = new List<object>();
                 var ignoredList = new List<object>();
 
@@ -97,12 +97,9 @@ public static class CustomizedResearchRoute
                     }
                 }
 
-                foreach (var req in reqList)
-                {
-                    await ProcessItems(req.Categories, "Categoria");
-                    await ProcessItems(req.Authors, "Autor");
-                    await ProcessItems(req.Sources, "Fonte");
-                }
+                await ProcessItems(req.Categories, "Categoria");
+                await ProcessItems(req.Authors, "Autor");
+                await ProcessItems(req.Sources, "Fonte");
 
                 return ResponseHelper.Ok(new
                 {

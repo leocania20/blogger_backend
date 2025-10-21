@@ -9,6 +9,7 @@ using System.Text;
 using Microsoft.OpenApi.Models;
 using blogger_backend.Middlewares;
 using System.Security.Claims;
+using System.Text.Json.Serialization; 
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -72,6 +73,12 @@ else
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString)
 );
+
+builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
+{
+    options.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+    options.SerializerOptions.WriteIndented = true;
+});
 
 
 

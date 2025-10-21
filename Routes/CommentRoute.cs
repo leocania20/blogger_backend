@@ -78,7 +78,7 @@ public static class ComentarioRoute
                 .ToListAsync();
 
             return Results.Ok(comments);
-        });
+        }).WithSummary("Visualizar todos os Comentários Ativos");
 
 
         route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
