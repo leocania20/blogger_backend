@@ -9,3 +9,5 @@ obj/
 
 # Banco de dados
 
+# Sengrid API Key
+appsettings.Development.json

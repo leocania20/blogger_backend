@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
+
 namespace blogger_backend.Routes
 {
     public static class ArticleRoute
@@ -14,104 +15,204 @@ namespace blogger_backend.Routes
         {
             var route = app.MapGroup("/articles").WithTags("Articles").RequireAuthorization();
 
-            string GetImagem(string? nameImagem, IConfiguration config)
+            string SaveImage(IFormFile? imageFile, string uploadsFolder)
             {
-                if (string.IsNullOrWhiteSpace(nameImagem))
-                    return "";
-                var baseUrl = config.GetValue<string>("BackendSettings:BaseUrl") ?? "http://localhost:5095";
-                return $"{baseUrl.TrimEnd('/')}/uploads/artigos/{nameImagem}";
+                if (imageFile == null || imageFile.Length == 0)
+                    return string.Empty;
+
+                if (!Directory.Exists(uploadsFolder))
+                    Directory.CreateDirectory(uploadsFolder);
+
+                var uniqueFileName = Guid.NewGuid().ToString() + Path.GetExtension(imageFile.FileName);
+                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    imageFile.CopyTo(stream);
+                }
+
+                return uniqueFileName;
             }
-route.MapPost("create", [Authorize] async (HttpContext http, ArticleRequest req, AppDbContext context, IConfiguration config) =>
+
+            route.MapPost("create", [Authorize, IgnoreAntiforgeryToken]
+                async (HttpContext http, [FromForm] ArticleRequest req, AppDbContext context, IConfiguration config) =>
+            {
+                try
+                {
+                    var userIdClaim = http.User.FindFirst("id")?.Value;
+                    var userName = http.User.FindFirst("name")?.Value ?? "Usuário Desconhecido";
+                    var userEmail = http.User.FindFirst("email")?.Value ?? "sememail@exemplo.com";
+
+                    if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+                        return Results.Unauthorized();
+
+                    var error = ValidationHelper.ValidateModel(req);
+                    if (error.Any())
+                        return Results.BadRequest(new { success = false, message = "Dados inválidos", error });
+                    var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "artigos");
+                    string imageName = SaveImage(req.Imagem, uploadsFolder);
+
+                    var baseUrl = config.GetValue<string>("BackendSettings:BaseUrl") ?? "http://localhost:5095";
+                    var imageUrl = !string.IsNullOrEmpty(imageName)
+                        ? $"{baseUrl.TrimEnd('/')}/uploads/artigos/{imageName}"
+                        : "";
+                    var author = await context.Authores.FirstOrDefaultAsync(a => a.UserId == userId);
+                    if (author == null)
+                    {
+                        author = new AuthorModel
+                        {
+                            Name = userName,
+                            Email = userEmail,
+                            Bio = "Autor criado automaticamente.",
+                            UserId = userId
+                        };
+                        await context.Authores.AddAsync(author);
+                        await context.SaveChangesAsync();
+                    }
+
+                    var article = new ArticlesModel
+                    {
+                        Title = req.Title,
+                        Tag = req.Tag,
+                        Text = req.Text,
+                        Summary = req.Summary,
+                        CreateDate = DateTime.UtcNow,
+                        UpDate = DateTime.UtcNow,
+                        IsPublished = req.IsPublished,
+                        CategoryId = req.CategoryId,
+                        SourceId = req.SourceId,
+                        AuthorId = author.Id,
+                        Imagem = imageUrl
+                    };
+
+                    await context.Articles.AddAsync(article);
+                    await context.SaveChangesAsync();
+
+                    return Results.Created($"/articles/{article.Id}", new
+                    {
+                        success = true,
+                        message = "Artigo criado com sucesso.",
+                        data = article
+                    });
+                }
+                catch (Exception ex)
+                {
+                    return ResponseHelper.ServerError($"Erro inesperado: {ex.Message}");
+                }
+            })
+                .Accepts<ArticleRequest>("multipart/form-data")
+                .WithSummary("Cadastra Artigos ")
+                .WithDescription("Permite enviar um artigo com imagem real e guardar em uploads/artigos.").DisableAntiforgery();
+
+
+            route.MapPut("/{id:int}/update", [Authorize] async (int id, [FromForm] ArticleRequest req, AppDbContext context, IConfiguration config) =>
 {
+    var article = await context.Articles.FirstOrDefaultAsync(a => a.Id == id);
+    if (article == null)
+        return Results.NotFound(new
+        {
+            success = false,
+            message = $"Artigo com ID {id} não encontrado.",
+            example = new
+            {
+                id = 1,
+                title = "Novo Título Atualizado",
+                tag = "educação",
+                text = "Conteúdo atualizado do artigo.",
+                summary = "Resumo atualizado.",
+                isPublished = true,
+                categoryId = 1,
+                authorId = 1,
+                sourceId = 1,
+                imagem = "nova_imagem.jpg"
+            }
+        });
+
+    var error = ValidationHelper.ValidateModel(req);
+    if (error.Any())
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "Os dados de atualização são inválidos.",
+            error,
+            example = new
+            {
+                title = "Artigo Atualizado",
+                tag = "ciência",
+                text = "Novo conteúdo válido.",
+                summary = "Resumo breve atualizado.",
+                isPublished = false,
+                categoryId = 1,
+                authorId = 1,
+                sourceId = 1,
+                imagem = "imagem_atualizada.jpg"
+            }
+        });
+
+    // 📁 Caminho físico (Render usa /opt/render/project/src)
+    var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "artigos");
+
+    // 📸 Se uma nova imagem foi enviada, salva
+    string? imageName = null;
+    if (req.Imagem != null && req.Imagem.Length > 0)
+    {
+        if (!Directory.Exists(uploadsFolder))
+            Directory.CreateDirectory(uploadsFolder);
+
+        imageName = Guid.NewGuid().ToString() + Path.GetExtension(req.Imagem.FileName);
+        var filePath = Path.Combine(uploadsFolder, imageName);
+
+        using (var stream = new FileStream(filePath, FileMode.Create))
+        {
+            await req.Imagem.CopyToAsync(stream);
+        }
+
+        // Deleta a antiga se quiser (opcional)
+        if (!string.IsNullOrEmpty(article.Imagem))
+        {
+            try
+            {
+                var oldFile = Path.Combine(uploadsFolder, Path.GetFileName(article.Imagem));
+                if (File.Exists(oldFile)) File.Delete(oldFile);
+            }
+            catch { /* Ignorar erros ao deletar */ }
+        }
+    }
+
+    // 🌐 Cria a URL pública se tiver imagem nova
+    var baseUrl = config.GetValue<string>("BackendSettings:BaseUrl") ?? "http://localhost:5095";
+    var imageUrl = imageName != null
+        ? $"{baseUrl.TrimEnd('/')}/uploads/artigos/{imageName}"
+        : article.Imagem; // mantém a antiga se não houver nova
+
+    // 🔄 Atualiza os campos
+    article.Title = req.Title;
+    article.Tag = req.Tag;
+    article.Text = req.Text;
+    article.Summary = req.Summary;
+    article.UpDate = DateTime.UtcNow;
+    article.IsPublished = req.IsPublished;
+    article.CategoryId = req.CategoryId;
+    article.AuthorId = req.AuthorId;
+    article.SourceId = req.SourceId;
+    article.Imagem = imageUrl;
+
     try
     {
-        // Obtém o ID do usuário autenticado
-        var userIdClaim = http.User.FindFirst("id")?.Value;
-        var userName = http.User.FindFirst("name")?.Value ?? "Usuário Desconhecido";
-        var userEmail = http.User.FindFirst("email")?.Value ?? "sememail@exemplo.com";
-
-        if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
-        {
-            return Results.Unauthorized();
-        }
-
-        // Validação dos dados enviados
-        var error = ValidationHelper.ValidateModel(req);
-        if (error.Any())
-        {
-            return Results.BadRequest(new
-            {
-                success = false,
-                message = "Os dados enviados são inválidos.",
-                error,
-                example = new
-                {
-                    title = "Exemplo de Título",
-                    tag = "educação",
-                    text = "Texto completo do artigo.",
-                    summary = "Resumo breve sobre o artigo.",
-                    isPublished = true,
-                    categoryId = 1,
-                    sourceId = 1,
-                    imagem = "exemplo.jpg"
-                }
-            });
-        }
-
-        var imagemUrl = GetImagem(req.Imagem, config);
-
-        // 🔹 Verifica se o usuário já é autor
-        var author = await context.Authores.FirstOrDefaultAsync(a => a.UserId == userId);
-
-        // 🔹 Se não for, cria automaticamente
-        if (author == null)
-        {
-            author = new AuthorModel
-            {
-                Name = userName,
-                Email = userEmail,
-                Bio = "Autor criado automaticamente.",
-                UserId = userId
-            };
-
-            await context.Authores.AddAsync(author);
-            await context.SaveChangesAsync();
-        }
-
-        // 🔹 Cria o artigo associado ao autor obrigatório
-        var article = new ArticlesModel
-        {
-            Title = req.Title,
-            Tag = req.Tag,
-            Text = req.Text,
-            Summary = req.Summary,
-            CreateDate = DateTime.UtcNow,
-            UpDate = DateTime.UtcNow,
-            IsPublished = req.IsPublished,
-            CategoryId = req.CategoryId,
-            AuthorId = author.Id, // obrigatório e garantido
-            SourceId = req.SourceId,
-            Imagem = imagemUrl
-        };
-
-        await context.Articles.AddAsync(article);
         await context.SaveChangesAsync();
-
-        return Results.Created($"/articles/{article.Id}", new
+        return Results.Ok(new
         {
             success = true,
-            message = "Artigo criado com sucesso.",
+            message = "Artigo atualizado com sucesso.",
             data = article
         });
     }
-    catch (DbUpdateException ex)
+    catch (DbUpdateException)
     {
-        Console.WriteLine("Erro BD => " + ex.InnerException?.Message);
         return Results.Conflict(new
         {
             success = false,
-            message = "Conflito ao gravar no banco de dados.",
-            details = ex.InnerException?.Message
+            message = "Erro de atualização: conflito nos dados do artigo.",
         });
     }
     catch (Exception ex)
@@ -119,98 +220,13 @@ route.MapPost("create", [Authorize] async (HttpContext http, ArticleRequest req,
         return ResponseHelper.ServerError($"Erro inesperado: {ex.Message}");
     }
 })
-.WithSummary("Cadastra Artigos (qualquer usuário autenticado)")
-.WithDescription("Permite que qualquer usuário autenticado crie artigos. Caso o usuário não tenha registro de autor, ele é criado automaticamente e vinculado ao artigo.");
+                .Accepts<ArticleRequest>("multipart/form-data")
+                .WithSummary("Atualiza um Artigo existente")
+                .WithDescription("Permite atualizar dados")
+                .Produces(StatusCodes.Status200OK)
+                .Produces(StatusCodes.Status404NotFound)
+                .Produces(StatusCodes.Status400BadRequest);
 
-
-            route.MapPut("/{id:int}/update", async (int id, ArticleRequest req, AppDbContext context, IConfiguration config) =>
-            {
-                var article = await context.Articles.FirstOrDefaultAsync(a => a.Id == id);
-                if (article == null)
-                    return Results.NotFound(new
-                    {
-                        success = false,
-                        message = $"Artigo com ID {id} não encontrado.",
-                        example = new
-                        {
-                            id = 1,
-                            title = "Novo Título Atualizado",
-                            tag = "educação",
-                            text = "Conteúdo atualizado do artigo.",
-                            summary = "Resumo atualizado.",
-                            isPublished = true,
-                            categoryId = 1,
-                            authorId = 1,
-                            sourceId = 1,
-                            imagem = "nova_imagem.jpg"
-                        }
-                    });
-
-                var error = ValidationHelper.ValidateModel(req);
-                if (error.Any())
-                    return Results.BadRequest(new
-                    {
-                        success = false,
-                        message = "Os dados de atualização são inválidos.",
-                        error,
-                        example = new
-                        {
-                            title = "Artigo Atualizado",
-                            tag = "ciência",
-                            text = "Novo conteúdo válido.",
-                            summary = "Resumo breve atualizado.",
-                            isPublished = false,
-                            categoryId = 1,
-                            authorId = 1,
-                            sourceId = 1,
-                            imagem = "imagem_atualizada.jpg"
-                        }
-                    });
-
-                article.Title = req.Title;
-                article.Tag = req.Tag;
-                article.Text = req.Text;
-                article.Summary = req.Summary;
-                article.UpDate = DateTime.UtcNow;
-                article.IsPublished = req.IsPublished;
-                article.CategoryId = req.CategoryId;
-                article.AuthorId = req.AuthorId;
-                article.SourceId = req.SourceId;
-
-                if (!string.IsNullOrWhiteSpace(req.Imagem))
-                    article.Imagem = GetImagem(req.Imagem, config);
-
-                try
-                {
-                    await context.SaveChangesAsync();
-                    return ResponseHelper.Ok(article);
-                }
-                catch (DbUpdateException)
-                {
-                    return Results.Conflict(new
-                    {
-                        success = false,
-                        message = "Erro de atualização: conflito nos dados do artigo.",
-                        example = new
-                        {
-                            title = "Título diferente de outro artigo existente",
-                            tag = "história",
-                            text = "Texto alterado sem duplicação.",
-                            summary = "Novo resumo original.",
-                            isPublished = true,
-                            categoryId = 2,
-                            authorId = 1,
-                            sourceId = 2,
-                            imagem = "imagem_valida.jpg"
-                        }
-                    });
-                }
-                catch (Exception ex)
-                {
-                    return ResponseHelper.ServerError($"Erro inesperado: {ex.Message}");
-                }
-            }).WithSummary("Actualiza um Artigo existente")
-              .AllowAnonymous();
 
             route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
             {
@@ -323,8 +339,8 @@ route.MapPost("create", [Authorize] async (HttpContext http, ArticleRequest req,
                     return ResponseHelper.ServerError($"Erro ao buscar artigos: {ex.Message}");
                 }
             })
-            .WithSummary("Pesquisa e Visualiza Artigos por título, categorias, fontes ou data (sem usuário logado)")
-            .AllowAnonymous();
+                .WithSummary("Pesquisa e Visualiza Artigos por título, categorias, fontes ou data (sem usuário logado)")
+                .AllowAnonymous();
 
             
             route.MapGet("/show-user", async (
@@ -402,8 +418,8 @@ route.MapPost("create", [Authorize] async (HttpContext http, ArticleRequest req,
                     return ResponseHelper.ServerError($"Erro ao buscar artigos personalizados: {ex.Message}");
                 }
             })
-            .WithSummary("Visualiza os Artigos do Usuário logado")
-            .WithDescription("Retorna artigos de acordo as configurações-preferências(categorias, autores e fontes).");
+                .WithSummary("Visualiza os Artigos do Usuário logado")
+                .WithDescription("Retorna artigos de acordo as configurações-preferências(categorias, autores e fontes).");
 
             route.MapGet("/suggest", async (string? query, AppDbContext context) =>
             {
@@ -443,9 +459,9 @@ route.MapPost("create", [Authorize] async (HttpContext http, ArticleRequest req,
                     return ResponseHelper.ServerError($"Erro ao buscar sugestões: {ex.Message}");
                 }
             })
-            .WithSummary("Pesquisa automática de títulos de artigos")
-            .WithDescription("Retorna até 10 sugestões de títulos que contêm o texto digitado.")
-            .AllowAnonymous();
-        }
+                .WithSummary("Pesquisa automática de títulos de artigos")
+                .WithDescription("Retorna até 10 sugestões de títulos que contêm o texto digitado.")
+                .AllowAnonymous();
+            }
     }
 }

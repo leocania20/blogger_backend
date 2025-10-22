@@ -22,7 +22,7 @@ public class ArticleRequest
         [Required(ErrorMessage = "O campo 'SourceId' é obrigatório.")]
         public int SourceId { get; set; }
 
-        public string? Imagem { get; set; }
+        public IFormFile? Imagem { get; set; } = null!;
         public bool IsPublished { get; set; } = false;
     }
 

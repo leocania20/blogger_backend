@@ -6,5 +6,6 @@ namespace blogger_backend.Models
         public string Email { get; set; } = null!;
         public DateTime CreateDate { get; set; } = DateTime.UtcNow;
         public bool Active { get; set; } = true;
+        public string UnsubscribeToken { get; set; } = Guid.NewGuid().ToString();
     }
 }

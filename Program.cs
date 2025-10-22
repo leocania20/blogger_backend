@@ -1,3 +1,4 @@
+using blogger_backend.Utils;
 using blogger_backend.Routes;
 using blogger_backend.Models;
 using blogger_backend.Data;
@@ -9,11 +10,15 @@ using System.Text;
 using Microsoft.OpenApi.Models;
 using blogger_backend.Middlewares;
 using System.Security.Claims;
-using System.Text.Json.Serialization; 
+using System.Text.Json.Serialization;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
+
 builder.Services.AddEndpointsApiExplorer();
+
 
 builder.Services.AddSwaggerGen(c =>
 {
@@ -45,7 +50,6 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-
 var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
 string connectionString;
 
@@ -64,15 +68,13 @@ else
 {
     connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
                        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' não foi encontrada.");
-
     Console.WriteLine("[INFO] Usando connection string local.");
 }
-
-
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString)
 );
+
 
 builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
 {
@@ -80,17 +82,23 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =
     options.SerializerOptions.WriteIndented = true;
 });
 
-
-
 builder.Services.AddScoped<IPasswordHasher<UserModel>, PasswordHasher<UserModel>>();
+ 
+builder.Services.AddScoped<SendGridEmailServices>();
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll",
-        policy => policy.AllowAnyOrigin()
-                        .AllowAnyMethod()
-                        .AllowAnyHeader());
+    options.AddPolicy("AllowAll", policy =>
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader());
 });
+
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add(new IgnoreAntiforgeryTokenAttribute());
+});
+
 
 var key = builder.Configuration["Jwt:Key"] ?? "chave-secreta-superforte";
 builder.Services.AddAuthentication(options =>
@@ -123,6 +131,11 @@ builder.Services.AddAuthorization(options =>
 
 var app = builder.Build();
 
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+}
+
 app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
@@ -130,18 +143,22 @@ app.UseSwaggerUI(options =>
     options.RoutePrefix = string.Empty;
 });
 
-using (var scope = app.Services.CreateScope())
+app.UseStaticFiles(new StaticFileOptions
 {
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
-}
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot")
+    ),
+    RequestPath = ""
+});
 
-
-app.UseCors("AllowAll"); 
+app.UseRouting();
+app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseStaticFiles(); 
+
+
 app.UseMiddleware<AccessLogMiddleware>();
+
 
 app.UserRoutes(builder.Configuration);
 app.MonitoringRoutes();
@@ -150,8 +167,14 @@ app.AuthorRoutes();
 app.CategoryRoutes();
 app.SourceRoute();
 app.CommentRoutes();
-app.NewsletterRoutes();
+app.NewsletterRoute();
 app.NotificationRoutes();
 app.PesquisaCustomizadaRoutes();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
 
 app.Run();
