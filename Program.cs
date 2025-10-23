@@ -16,10 +16,21 @@ using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Configuration.AddEnvironmentVariables();
+
+
+string GetEnvOrConfig(string key)
+{
+    var value = builder.Configuration[key];
+    if (!string.IsNullOrEmpty(value) && value.StartsWith("env:"))
+    {
+        var envKey = value.Replace("env:", "");
+        return Environment.GetEnvironmentVariable(envKey) ?? "";
+    }
+    return value ?? "";
+}
 
 builder.Services.AddEndpointsApiExplorer();
-
-
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Blogger API", Version = "v1" });
@@ -50,8 +61,8 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
 string connectionString;
+var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
 
 if (!string.IsNullOrEmpty(databaseUrl))
 {
@@ -83,8 +94,8 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =
 });
 
 builder.Services.AddScoped<IPasswordHasher<UserModel>, PasswordHasher<UserModel>>();
- 
 builder.Services.AddScoped<SendGridEmailServices>();
+
 
 builder.Services.AddCors(options =>
 {
@@ -94,13 +105,17 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader());
 });
 
+
 builder.Services.AddControllers(options =>
 {
     options.Filters.Add(new IgnoreAntiforgeryTokenAttribute());
 });
 
 
-var key = builder.Configuration["Jwt:Key"] ?? "chave-secreta-superforte";
+var jwtKey = GetEnvOrConfig("Jwt:Key");
+if (string.IsNullOrEmpty(jwtKey))
+    jwtKey = "chave-secreta-superforte"; 
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -116,9 +131,10 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = false,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(key))
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(jwtKey))
     };
 });
+
 
 builder.Services.AddAuthorization(options =>
 {
@@ -159,7 +175,6 @@ app.UseAuthorization();
 
 app.UseMiddleware<AccessLogMiddleware>();
 
-
 app.UserRoutes(builder.Configuration);
 app.MonitoringRoutes();
 app.ArticlesRoutes();
@@ -170,6 +185,7 @@ app.CommentRoutes();
 app.NewsletterRoute();
 app.NotificationRoutes();
 app.PesquisaCustomizadaRoutes();
+
 
 using (var scope = app.Services.CreateScope())
 {

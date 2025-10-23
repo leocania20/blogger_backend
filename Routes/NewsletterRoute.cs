@@ -18,7 +18,7 @@ namespace blogger_backend.Routes
                 try
                 {
                     string? email =
-                        http.User.FindFirst(ClaimTypes.Email)?.Value ??
+                        http.User.FindFirst(ClaimTypes.Name)?.Value ??
                         http.User.FindFirst("email")?.Value ??
                         http.User.FindFirst("Email")?.Value ??
                         http.User.FindFirst("unique_name")?.Value ??
