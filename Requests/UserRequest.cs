@@ -27,3 +27,7 @@ public record UserLoginRequest(
        string Email,
        string Password
 );
+public class RefreshRequest
+    {
+        public string RefreshToken { get; set; } = null!;
+    }

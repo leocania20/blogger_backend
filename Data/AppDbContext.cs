@@ -20,8 +20,8 @@ namespace blogger_backend.Data
         public DbSet<CustomizedResearchModel> CustomizedResearches { get; set; } = null!;
         public DbSet<AccessLogModel> AccessLogs { get; set; }
         public DbSet<NewsletterLog> NewsletterLogs { get; set; } = null!;
-
-
+        public DbSet<RefreshTokenModel> RefreshTokens { get; set; }
+        public DbSet<RevokedTokenModel> RevokedTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

@@ -5,6 +5,7 @@ using blogger_backend.Utils;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace blogger_backend.Routes;
 
@@ -58,32 +59,91 @@ public static class UserRoute
             }
         }).WithSummary("Cadastra Usuários");
 
-
         route.MapPost("/signin", async (
             UserLoginRequest req,
             AppDbContext context,
-            IPasswordHasher<UserModel> hasher) =>
+            IPasswordHasher<UserModel> hasher,
+            IConfiguration config) =>
+            {
+                try
+                {
+                    var user = await context.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
+                    if (user == null || !user.Active)
+                        return ResponseHelper.NotFound("Usuário não encontrado ou desativado.", new { req.Email });
+
+                    var result = hasher.VerifyHashedPassword(user, user.Password, req.Password);
+                    if (result == PasswordVerificationResult.Failed)
+                        return ResponseHelper.BadRequest("Credenciais incorretas.", null, new { Email = req.Email, Password = "********" });
+
+                    string secretKey = config["Jwt:Key"] ?? "chave-secreta-superforte-com-32-caracteres!";
+                    string token = JwtTokenService.GenerateToken(user.Email, user.Role, secretKey, user.Id, user.Name);
+
+                    string refreshToken = JwtTokenService.GenerateRefreshToken();
+
+                    var refreshModel = new RefreshTokenModel
+                    {
+                        UserId = user.Id,
+                        Token = refreshToken,
+                        Expiration = DateTime.UtcNow.AddDays(7) 
+                    };
+
+                    context.RefreshTokens.Add(refreshModel);
+                    await context.SaveChangesAsync();
+
+                    return ResponseHelper.Ok(new
+                    {
+                        Token = $"Bearer {token}",
+                        RefreshToken = refreshToken
+                    }, "Login realizado com sucesso.");
+                }
+                catch (Exception ex)
+                {
+                    return ResponseHelper.ServerError(ex.Message);
+                }
+            });
+
+        route.MapPost("/refresh", async (AppDbContext context, RefreshRequest req, IConfiguration config) =>
         {
-            try
+            var stored = await context.RefreshTokens
+                .FirstOrDefaultAsync(r => r.Token == req.RefreshToken);
+
+            if (stored == null)
+                return ResponseHelper.BadRequest("Refresh token inválido.");
+
+            if (stored.Revoked)
+                return ResponseHelper.BadRequest("Refresh token já foi usado ou revogado.");
+
+            if (stored.Expiration < DateTime.UtcNow)
             {
-                var user = await context.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
-                if (user == null || !user.Active)
-                    return ResponseHelper.NotFound("Usuário não encontrado ou desativado.", new { req.Email });
-
-                var result = hasher.VerifyHashedPassword(user, user.Password, req.Password);
-                if (result == PasswordVerificationResult.Failed)
-                    return ResponseHelper.BadRequest("Credenciais incorretas.", null, new { Email = req.Email, Password = "********" });
-
-                string secretKey = config["Jwt:Key"] ?? "chave-secreta-superforte-com-32-caracteres!";
-                string token = JwtTokenService.GenerateToken(user.Email, user.Role, secretKey, user.Id, user.Name);
-
-                return ResponseHelper.Ok(new { Token = $"Bearer {token}" }, "Login realizado com sucesso.");
+                stored.Revoked = true;
+                await context.SaveChangesAsync();
+                return ResponseHelper.BadRequest("Refresh token expirado.");
             }
-            catch (Exception ex)
+
+            var user = await context.Users.FindAsync(stored.UserId);
+            if (user == null)
+                return ResponseHelper.NotFound("Usuário não encontrado.");
+
+            string secretKey = config["Jwt:Key"]!;
+            string newAccessToken = JwtTokenService.GenerateToken(user.Email, user.Role, secretKey, user.Id, user.Name);
+
+            var newRefresh = new RefreshTokenModel
             {
-                return ResponseHelper.ServerError(ex.Message);
-            }
-        }).WithSummary("Login de Usuário");
+                UserId = user.Id,
+                Token = Guid.NewGuid().ToString(),
+                Expiration = DateTime.UtcNow.AddDays(7)
+            };
+
+            stored.Revoked = true;
+            context.RefreshTokens.Add(newRefresh);
+            await context.SaveChangesAsync();
+
+            return ResponseHelper.Ok(new
+            {
+                Token = $"Bearer {newAccessToken}",
+                RefreshToken = newRefresh.Token
+            }, "Token renovado com sucesso.");
+        });
 
         route.MapGet("/profile", [Authorize] (HttpContext http) =>
         {
@@ -107,6 +167,34 @@ public static class UserRoute
                 return ResponseHelper.ServerError(ex.Message);
             }
         }).WithSummary("Visualiza Perfil do Usuário Logado");
+
+        route.MapPost("/logout", [Authorize] async (HttpContext http, AppDbContext context) =>
+        {
+            try
+            {
+                var jti = http.User.FindFirstValue(JwtRegisteredClaimNames.Jti);
+                if (!string.IsNullOrEmpty(jti))
+                {
+                    context.RevokedTokens.Add(new RevokedTokenModel { Jti = jti });
+                }
+
+                var userId = http.User.FindFirstValue("id");
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    int id = int.Parse(userId);
+                    var tokens = context.RefreshTokens.Where(t => t.UserId == id && !t.Revoked);
+                    foreach (var t in tokens)
+                        t.Revoked = true;
+                }
+
+                await context.SaveChangesAsync();
+                return ResponseHelper.Ok(null, "Logout realizado com sucesso. Tokens revogados.");
+            }
+            catch (Exception ex)
+            {
+                return ResponseHelper.ServerError(ex.Message);
+            }
+        });
 
         route.MapGet("show", async (AppDbContext context) =>
         {

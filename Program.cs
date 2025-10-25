@@ -185,6 +185,8 @@ app.CommentRoutes();
 app.NewsletterRoute();
 app.NotificationRoutes();
 app.PesquisaCustomizadaRoutes();
+app.UseMiddleware<RevokedTokenMiddleware>();
+
 
 
 using (var scope = app.Services.CreateScope())

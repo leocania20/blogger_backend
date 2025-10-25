@@ -105,127 +105,144 @@ namespace blogger_backend.Routes
                 .WithDescription("Permite enviar um artigo com imagem real e guardar em uploads/artigos.").DisableAntiforgery();
 
 
-            route.MapPut("/{id:int}/update", [Authorize] async (int id, [FromForm] ArticleRequest req, AppDbContext context, IConfiguration config) =>
-{
-    var article = await context.Articles.FirstOrDefaultAsync(a => a.Id == id);
-    if (article == null)
-        return Results.NotFound(new
-        {
-            success = false,
-            message = $"Artigo com ID {id} não encontrado.",
-            example = new
+            route.MapPut("/{id:int}/update", [Authorize] async (
+                int id,
+                HttpContext http,
+                [FromForm] ArticleRequest req,
+                AppDbContext context,
+                IConfiguration config
+            ) =>
             {
-                id = 1,
-                title = "Novo Título Atualizado",
-                tag = "educação",
-                text = "Conteúdo atualizado do artigo.",
-                summary = "Resumo atualizado.",
-                isPublished = true,
-                categoryId = 1,
-                authorId = 1,
-                sourceId = 1,
-                imagem = "nova_imagem.jpg"
-            }
-        });
+                try
+                {
+                    var article = await context.Articles.FirstOrDefaultAsync(a => a.Id == id);
+                    if (article == null)
+                        return Results.NotFound(new
+                        {
+                            success = false,
+                            message = $"Artigo com ID {id} não encontrado.",
+                            example = new
+                            {
+                                id = 1,
+                                title = "Novo Título Atualizado",
+                                tag = "educação",
+                                text = "Conteúdo atualizado do artigo.",
+                                summary = "Resumo atualizado.",
+                                isPublished = true,
+                                categoryId = 1,
+                                sourceId = 1,
+                                imagem = "nova_imagem.jpg"
+                            }
+                        });
+                    var errors = ValidationHelper.ValidateModel(req);
+                    if (errors.Any())
+                        return Results.BadRequest(new
+                        {
+                            success = false,
+                            message = "Os dados de atualização são inválidos.",
+                            errors
+                        });
 
-    var error = ValidationHelper.ValidateModel(req);
-    if (error.Any())
-        return Results.BadRequest(new
-        {
-            success = false,
-            message = "Os dados de atualização são inválidos.",
-            error,
-            example = new
-            {
-                title = "Artigo Atualizado",
-                tag = "ciência",
-                text = "Novo conteúdo válido.",
-                summary = "Resumo breve atualizado.",
-                isPublished = false,
-                categoryId = 1,
-                authorId = 1,
-                sourceId = 1,
-                imagem = "imagem_atualizada.jpg"
-            }
-        });
+                    var userIdClaim = http.User.FindFirst("id")?.Value;
+                    if (string.IsNullOrEmpty(userIdClaim))
+                        return Results.Unauthorized();
 
-    // 📁 Caminho físico (Render usa /opt/render/project/src)
-    var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "artigos");
+                    int userId = int.Parse(userIdClaim);
+                    var author = await context.Authores.FirstOrDefaultAsync(a => a.UserId == userId);
+                    if (author == null)
+                    {
+                        var user = await context.Users.FindAsync(userId);
+                        if (user != null)
+                        {
+                            author = new AuthorModel
+                            {
+                                Name = user.Name,
+                                Email = user.Email,
+                                Bio = $"Autor criado automaticamente para o usuário {user.Name}",
+                                UserId = user.Id
+                            };
+                            context.Authores.Add(author);
+                            await context.SaveChangesAsync();
+                        }
+                        else
+                        {
+                            return Results.BadRequest(new { success = false, message = "Usuário associado não encontrado." });
+                        }
+                    }
 
-    // 📸 Se uma nova imagem foi enviada, salva
-    string? imageName = null;
-    if (req.Imagem != null && req.Imagem.Length > 0)
-    {
-        if (!Directory.Exists(uploadsFolder))
-            Directory.CreateDirectory(uploadsFolder);
+                    var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "artigos");
+                    string? imageName = null;
 
-        imageName = Guid.NewGuid().ToString() + Path.GetExtension(req.Imagem.FileName);
-        var filePath = Path.Combine(uploadsFolder, imageName);
+                    if (req.Imagem != null && req.Imagem.Length > 0)
+                    {
+                        if (!Directory.Exists(uploadsFolder))
+                            Directory.CreateDirectory(uploadsFolder);
 
-        using (var stream = new FileStream(filePath, FileMode.Create))
-        {
-            await req.Imagem.CopyToAsync(stream);
-        }
+                        imageName = Guid.NewGuid().ToString() + Path.GetExtension(req.Imagem.FileName);
+                        var filePath = Path.Combine(uploadsFolder, imageName);
 
-        // Deleta a antiga se quiser (opcional)
-        if (!string.IsNullOrEmpty(article.Imagem))
-        {
-            try
-            {
-                var oldFile = Path.Combine(uploadsFolder, Path.GetFileName(article.Imagem));
-                if (File.Exists(oldFile)) File.Delete(oldFile);
-            }
-            catch { /* Ignorar erros ao deletar */ }
-        }
-    }
+                        using (var stream = new FileStream(filePath, FileMode.Create))
+                        {
+                            await req.Imagem.CopyToAsync(stream);
+                        }
+                        if (!string.IsNullOrEmpty(article.Imagem))
+                        {
+                            try
+                            {
+                                var oldFile = Path.Combine(uploadsFolder, Path.GetFileName(article.Imagem));
+                                if (File.Exists(oldFile)) File.Delete(oldFile);
+                            }
+                            catch { }
+                        }
+                    }
 
-    // 🌐 Cria a URL pública se tiver imagem nova
-    var baseUrl = config.GetValue<string>("BackendSettings:BaseUrl") ?? "http://localhost:5095";
-    var imageUrl = imageName != null
-        ? $"{baseUrl.TrimEnd('/')}/uploads/artigos/{imageName}"
-        : article.Imagem; // mantém a antiga se não houver nova
+                    var baseUrl = config.GetValue<string>("BackendSettings:BaseUrl") ?? "http://localhost:5095";
+                    var imageUrl = imageName != null
+                        ? $"{baseUrl.TrimEnd('/')}/uploads/artigos/{imageName}"
+                        : article.Imagem;
+                    article.Title = req.Title;
+                    article.Tag = req.Tag;
+                    article.Text = req.Text;
+                    article.Summary = req.Summary;
+                    article.UpDate = DateTime.UtcNow;
+                    article.IsPublished = req.IsPublished;
+                    article.CategoryId = req.CategoryId;
+                    article.SourceId = req.SourceId;
+                    article.AuthorId = author.Id; 
+                    article.Imagem = imageUrl;
 
-    // 🔄 Atualiza os campos
-    article.Title = req.Title;
-    article.Tag = req.Tag;
-    article.Text = req.Text;
-    article.Summary = req.Summary;
-    article.UpDate = DateTime.UtcNow;
-    article.IsPublished = req.IsPublished;
-    article.CategoryId = req.CategoryId;
-    article.AuthorId = req.AuthorId;
-    article.SourceId = req.SourceId;
-    article.Imagem = imageUrl;
+                    await context.SaveChangesAsync();
 
-    try
-    {
-        await context.SaveChangesAsync();
-        return Results.Ok(new
-        {
-            success = true,
-            message = "Artigo atualizado com sucesso.",
-            data = article
-        });
-    }
-    catch (DbUpdateException)
-    {
-        return Results.Conflict(new
-        {
-            success = false,
-            message = "Erro de atualização: conflito nos dados do artigo.",
-        });
-    }
-    catch (Exception ex)
-    {
-        return ResponseHelper.ServerError($"Erro inesperado: {ex.Message}");
-    }
-})
-                .Accepts<ArticleRequest>("multipart/form-data")
-                .WithSummary("Atualiza um Artigo existente")
-                .WithDescription("Permite atualizar dados")
-                .Produces(StatusCodes.Status200OK)
-                .Produces(StatusCodes.Status404NotFound)
-                .Produces(StatusCodes.Status400BadRequest);
+                    return Results.Ok(new
+                    {
+                        success = true,
+                        message = "Artigo atualizado com sucesso e autor definido automaticamente.",
+                        data = new
+                        {
+                            article.Id,
+                            article.Title,
+                            article.Summary,
+                            Author = author.Name,
+                            article.Imagem
+                        }
+                    });
+                }
+                catch (DbUpdateException)
+                {
+                    return Results.Conflict(new
+                    {
+                        success = false,
+                        message = "Erro de atualização: conflito nos dados do artigo."
+                    });
+                }
+                catch (Exception ex)
+                {
+                    return ResponseHelper.ServerError($"Erro inesperado: {ex.Message}");
+                }
+            })
+            .Accepts<ArticleRequest>("multipart/form-data")
+            .WithSummary("Atualiza um Artigo existente com o Id")
+            .WithDescription("Permite atualizar dados de um artigo e define o autor baseado no usuário autenticado.");
 
 
             route.MapDelete("/{id:int}/delete", async (int id, AppDbContext context) =>
@@ -347,77 +364,77 @@ namespace blogger_backend.Routes
                 HttpContext http,
                 AppDbContext context,
                 int? page
-            ) =>
-            {
-                try
+                ) =>
                 {
-                    var userId = http.User.FindFirst("id")?.Value;
-                    if (string.IsNullOrEmpty(userId))
-                        return ResponseHelper.BadRequest("Usuário não autenticado.", null, new { Exemplo = new { Token = "Bearer seu_token_aqui" } });
-
-                    int usersId = int.Parse(userId);
-
-                    var preferences = await context.CustomizedResearches
-                        .Where(p => p.UserId == usersId)
-                        .ToListAsync();
-
-                    if (preferences == null || preferences.Count == 0)
-                    {
-                        return ResponseHelper.Ok(new
-                        {
-                            page = 1,
-                            pageSize = 6,
-                            total = 0,
-                            totalPages = 0,
-                            articles = new List<object>()
-                        }, "Nenhuma preferência encontrada para o usuário. Nenhum artigo disponível.");
-                    }
-
-                    var categoryIds = preferences.Where(p => p.CategoryId.HasValue).Select(p => p.CategoryId!.Value).Distinct().ToList();
-                    var authorIds = preferences.Where(p => p.AuthorId.HasValue).Select(p => p.AuthorId!.Value).Distinct().ToList();
-                    var sourceIds = preferences.Where(p => p.SourceId.HasValue).Select(p => p.SourceId!.Value).Distinct().ToList();
-
-                    var result = await HelpGetArticle.GetArticle(
-                        context,
-                        currentPage: page ?? 1,
-                        pageSize: 6,
-                        id: null,
-                        title: null,
-                        categoriesIds: categoryIds,
-                        authorsIds: authorIds,
-                        sourcesIds: sourceIds,
-                        date: null
-                    );
-                    dynamic dyn = result;
-                    IEnumerable<object>? articles = null;
-
                     try
                     {
-                        articles = (IEnumerable<object>?)dyn.articles;
-                    }
-                    catch
-                    {
-                        try { articles = (IEnumerable<object>?)dyn.Articles; } catch { articles = null; }
-                    }
+                        var userId = http.User.FindFirst("id")?.Value;
+                        if (string.IsNullOrEmpty(userId))
+                            return ResponseHelper.BadRequest("Usuário não autenticado.", null, new { Exemplo = new { Token = "Bearer seu_token_aqui" } });
 
-                    if (articles == null || !articles.Any())
-                    {
-                        return ResponseHelper.Ok(new
+                        int usersId = int.Parse(userId);
+
+                        var preferences = await context.CustomizedResearches
+                            .Where(p => p.UserId == usersId)
+                            .ToListAsync();
+
+                        if (preferences == null || preferences.Count == 0)
                         {
-                            page = page ?? 1,
-                            pageSize = 6,
-                            total = 0,
-                            totalPages = 0,
-                            articles = new List<object>()
-                        }, "Nenhum artigo encontrado com base nas preferências do usuário.");
+                            return ResponseHelper.Ok(new
+                            {
+                                page = 1,
+                                pageSize = 6,
+                                total = 0,
+                                totalPages = 0,
+                                articles = new List<object>()
+                            }, "Nenhuma preferência encontrada para o usuário. Nenhum artigo disponível.");
+                        }
+
+                        var categoryIds = preferences.Where(p => p.CategoryId.HasValue).Select(p => p.CategoryId!.Value).Distinct().ToList();
+                        var authorIds = preferences.Where(p => p.AuthorId.HasValue).Select(p => p.AuthorId!.Value).Distinct().ToList();
+                        var sourceIds = preferences.Where(p => p.SourceId.HasValue).Select(p => p.SourceId!.Value).Distinct().ToList();
+
+                        var result = await HelpGetArticle.GetArticle(
+                            context,
+                            currentPage: page ?? 1,
+                            pageSize: 6,
+                            id: null,
+                            title: null,
+                            categoriesIds: categoryIds,
+                            authorsIds: authorIds,
+                            sourcesIds: sourceIds,
+                            date: null
+                        );
+                        dynamic dyn = result;
+                        IEnumerable<object>? articles = null;
+
+                        try
+                        {
+                            articles = (IEnumerable<object>?)dyn.articles;
+                        }
+                        catch
+                        {
+                            try { articles = (IEnumerable<object>?)dyn.Articles; } catch { articles = null; }
+                        }
+
+                        if (articles == null || !articles.Any())
+                        {
+                            return ResponseHelper.Ok(new
+                            {
+                                page = page ?? 1,
+                                pageSize = 6,
+                                total = 0,
+                                totalPages = 0,
+                                articles = new List<object>()
+                            }, "Nenhum artigo encontrado com base nas preferências do usuário.");
+                        }
+                        return ResponseHelper.Ok(result, "Artigos recomendados com base nas preferências do usuário.");
                     }
-                    return ResponseHelper.Ok(result, "Artigos recomendados com base nas preferências do usuário.");
-                }
-                catch (Exception ex)
-                {
-                    return ResponseHelper.ServerError($"Erro ao buscar artigos personalizados: {ex.Message}");
-                }
-            })
+                    catch (Exception ex)
+                    {
+                        return ResponseHelper.ServerError($"Erro ao buscar artigos personalizados: {ex.Message}");
+                    }
+                })
                 .WithSummary("Visualiza os Artigos do Usuário logado")
                 .WithDescription("Retorna artigos de acordo as configurações-preferências(categorias, autores e fontes).");
 
@@ -462,6 +479,78 @@ namespace blogger_backend.Routes
                 .WithSummary("Pesquisa automática de títulos de artigos")
                 .WithDescription("Retorna até 10 sugestões de títulos que contêm o texto digitado.")
                 .AllowAnonymous();
+
+            route.MapGet("/my-articles", [Authorize] async (
+                HttpContext http,
+                AppDbContext context,
+                int? page) =>
+            {
+                try
+                {
+                    var userId = http.User.FindFirst("id")?.Value;
+                    if (string.IsNullOrEmpty(userId))
+                        return ResponseHelper.BadRequest("Usuário não autenticado.", null, new { Exemplo = new { Token = "Bearer seu_token_aqui" } });
+
+                    int usuarioId = int.Parse(userId); 
+
+                    var query = context.Articles
+                        .Where(a => a.AuthorId == usuarioId) 
+                        .Include(a => a.Author)
+                        .Include(a => a.Category)
+                        .Include(a => a.Source)
+                        .OrderByDescending(a => a.CreateDate);
+
+                    int currentPage = page ?? 1;
+                    int pageSize = 6;
+                    int total = await query.CountAsync();
+                    int totalPages = (int)Math.Ceiling(total / (double)pageSize);
+
+                    var articles = await query
+                        .Skip((currentPage - 1) * pageSize)
+                        .Take(pageSize)
+                        .Select(a => new
+                        {
+                            a.Id,
+                            a.Title,
+                            a.Summary,
+                            a.Text,
+                            a.Imagem,
+                            Category = a.Category != null ? a.Category.Name : "Sem categoria",
+                            Author = a.Author != null ? a.Author.Name : "Autor desconhecido",
+                            Source = a.Source != null ? a.Source.Name : "Sem fonte",
+                            a.CreateDate
+                        })
+                        .ToListAsync();
+
+                    if (articles == null || articles.Count == 0)
+                    {
+                        return ResponseHelper.Ok(new
+                        {
+                            page = currentPage,
+                            pageSize,
+                            total = 0,
+                            totalPages = 0,
+                            articles = new List<object>()
+                        }, "Nenhum artigo encontrado para este usuário.");
+                    }
+
+                    return ResponseHelper.Ok(new
+                    {
+                        page = currentPage,
+                        pageSize,
+                        total,
+                        totalPages,
+                        articles
+                    }, "Artigos criados pelo usuário logado retornados com sucesso.");
+                }
+                catch (Exception ex)
+                {
+                    return ResponseHelper.ServerError($"Erro ao buscar artigos do usuário: {ex.Message}");
+                }
+            })
+            .WithSummary("Visualiza os artigos criados pelo usuário logado")
+            .WithDescription("Retorna todos os artigos criados/postados pelo usuário autenticado, mostrando nomes de categoria, autor e fonte.");
+
             }
     }
 }

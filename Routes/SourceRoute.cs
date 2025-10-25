@@ -169,7 +169,7 @@ public static class FonteRoute
                         "Fonte não encontrada.",
                         new { Id = id });
 
-                source.Active = false;
+                context.Sources.Remove(source);
                 await context.SaveChangesAsync();
 
                 return ResponseHelper.Ok(
@@ -179,11 +179,11 @@ public static class FonteRoute
                         source.Name,
                         source.URL
                     },
-                    "Fonte desativada com sucesso.");
+                    "Fonte deletada com sucesso.");
             }
             catch (Exception ex)
             {
-                return ResponseHelper.ServerError($"Erro ao desativar fonte: {ex.Message}");
+                return ResponseHelper.ServerError($"Erro ao deletar a fonte: {ex.Message}");
             }
         }).WithSummary("Deleta Fonte pelo ID");
     }
