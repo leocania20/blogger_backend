@@ -2,22 +2,21 @@ using blogger_backend.Utils;
 using blogger_backend.Routes;
 using blogger_backend.Models;
 using blogger_backend.Data;
+using blogger_backend.Middlewares;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Identity;
-using System.Text;
-using Microsoft.OpenApi.Models;
-using blogger_backend.Middlewares;
-using System.Security.Claims;
-using System.Text.Json.Serialization;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddEnvironmentVariables();
-
 
 string GetEnvOrConfig(string key)
 {
@@ -30,6 +29,9 @@ string GetEnvOrConfig(string key)
     return value ?? "";
 }
 
+// -------------------------------
+// 🔧 Configuração do Swagger
+// -------------------------------
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -61,6 +63,9 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// -------------------------------
+// 🗄️ Configuração do Banco de Dados (PostgreSQL)
+// -------------------------------
 string connectionString;
 var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
 
@@ -86,17 +91,24 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString)
 );
 
-
+// -------------------------------
+// ⚙️ Configuração JSON
+// -------------------------------
 builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
 {
     options.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
     options.SerializerOptions.WriteIndented = true;
 });
 
+// -------------------------------
+// 🛠️ Serviços (injeções)
+// -------------------------------
 builder.Services.AddScoped<IPasswordHasher<UserModel>, PasswordHasher<UserModel>>();
 builder.Services.AddScoped<SendGridEmailServices>();
 
-
+// -------------------------------
+// 🌍 CORS
+// -------------------------------
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -105,16 +117,20 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader());
 });
 
-
+// -------------------------------
+// 🚫 Desativar validação de antiforgery
+// -------------------------------
 builder.Services.AddControllers(options =>
 {
     options.Filters.Add(new IgnoreAntiforgeryTokenAttribute());
 });
 
-
+// -------------------------------
+// 🔐 JWT
+// -------------------------------
 var jwtKey = GetEnvOrConfig("Jwt:Key");
 if (string.IsNullOrEmpty(jwtKey))
-    jwtKey = "chave-secreta-superforte"; 
+    jwtKey = "chave-secreta-superforte"; // fallback local
 
 builder.Services.AddAuthentication(options =>
 {
@@ -135,7 +151,9 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-
+// -------------------------------
+// 🔒 Autorização
+// -------------------------------
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("Admin", policy =>
@@ -145,6 +163,9 @@ builder.Services.AddAuthorization(options =>
         policy.RequireClaim(ClaimTypes.Role, "admin", "SuperAdmin"));
 });
 
+// -------------------------------
+// 🚀 Construção do app
+// -------------------------------
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -152,6 +173,9 @@ if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();
 }
 
+// -------------------------------
+// 📘 Swagger
+// -------------------------------
 app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
@@ -159,6 +183,9 @@ app.UseSwaggerUI(options =>
     options.RoutePrefix = string.Empty;
 });
 
+// -------------------------------
+// 🖼️ Arquivos estáticos
+// -------------------------------
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(
@@ -167,17 +194,22 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = ""
 });
 
+// -------------------------------
+// 🚦 Pipeline
+// -------------------------------
 app.UseRouting();
 app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 
-
 app.UseMiddleware<AccessLogMiddleware>();
 
+// -------------------------------
+// 🧭 Rotas (endpoints)
+// -------------------------------
 app.UserRoutes(builder.Configuration);
 app.MonitoringRoutes();
-app.ArticlesRoutes();
+app.ArticlesRoutes();      // ✅ Aqui está a rota de criação do artigo
 app.AuthorRoutes();
 app.CategoryRoutes();
 app.SourceRoute();
@@ -185,10 +217,12 @@ app.CommentRoutes();
 app.NewsletterRoute();
 app.NotificationRoutes();
 app.PesquisaCustomizadaRoutes();
+
 app.UseMiddleware<RevokedTokenMiddleware>();
 
-
-
+// -------------------------------
+// 🗃️ Migrações automáticas
+// -------------------------------
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

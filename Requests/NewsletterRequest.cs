@@ -7,7 +7,6 @@ public class NewsletterRequest {
     [Required(ErrorMessage = "O e-mail é obrigatório.")]
     [EmailAddress(ErrorMessage = "O e-mail fornecido não é válido.")]
     public string Email { get; set; } = null!;
-    bool Active;
 }
 public class NewsletterSendRequest
     {

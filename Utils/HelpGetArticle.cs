@@ -40,6 +40,7 @@ namespace blogger_backend.Utils
                 .Include(a => a.Author)
                 .Include(a => a.Category)
                 .Include(a => a.Source)
+                .Where(a => a.IsPublished == true)
                 .AsQueryable();
 
             bool hasFilter =

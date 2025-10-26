@@ -39,9 +39,16 @@ namespace blogger_backend.Routes
             {
                 try
                 {
+                    
                     var userIdClaim = http.User.FindFirst("id")?.Value;
-                    var userName = http.User.FindFirst("name")?.Value ?? "Usuário Desconhecido";
-                    var userEmail = http.User.FindFirst("email")?.Value ?? "sememail@exemplo.com";
+                    var userName = http.User.FindFirst("name")?.Value 
+                                ?? http.User.Identity?.Name 
+                                ?? "Usuário Desconhecido";
+                    var userEmail = http.User.FindFirst("email")?.Value 
+                                    ?? http.User.FindFirst(ClaimTypes.Email)?.Value 
+                                    ?? http.User.FindFirst(ClaimTypes.Name)?.Value
+                                    ?? "sememail@exemplo.com";
+
 
                     if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
                         return Results.Unauthorized();
@@ -56,13 +63,25 @@ namespace blogger_backend.Routes
                     var imageUrl = !string.IsNullOrEmpty(imageName)
                         ? $"{baseUrl.TrimEnd('/')}/uploads/artigos/{imageName}"
                         : "";
-                    var author = await context.Authores.FirstOrDefaultAsync(a => a.UserId == userId);
-                    if (author == null)
+
+                                        AuthorModel? author = null;
+                    var normalizedEmail = userEmail.Trim().ToLower();
+
+                    var existingAuthor = await context.Authores
+                        .FirstOrDefaultAsync(a => a.Email.ToLower() == normalizedEmail);
+
+                    if (existingAuthor != null)
                     {
+                        // Se já existir, reutiliza
+                        author = existingAuthor;
+                    }
+                    else
+                    {
+                        // Caso contrário, cria um novo
                         author = new AuthorModel
                         {
                             Name = userName,
-                            Email = userEmail,
+                            Email = normalizedEmail,
                             Bio = "Autor criado automaticamente.",
                             UserId = userId
                         };
@@ -78,7 +97,7 @@ namespace blogger_backend.Routes
                         Summary = req.Summary,
                         CreateDate = DateTime.UtcNow,
                         UpDate = DateTime.UtcNow,
-                        IsPublished = req.IsPublished,
+                        IsPublished = false,
                         CategoryId = req.CategoryId,
                         SourceId = req.SourceId,
                         AuthorId = author.Id,
@@ -281,7 +300,7 @@ namespace blogger_backend.Routes
                 {
                     return ResponseHelper.ServerError($"Erro ao buscar artigo: {ex.Message}");
                 }
-            }).WithSummary("Visualiza os dados compleoto dos artigo pelo ID(pagina inteira do artigo)")
+            }).WithSummary("Visualiza os dados completo dos artigo pelo ID(pagina inteira do artigo)")
               .AllowAnonymous();
 
             route.MapGet("/show-short", async (int? page, AppDbContext context) =>
@@ -494,7 +513,7 @@ namespace blogger_backend.Routes
                     int usuarioId = int.Parse(userId); 
 
                     var query = context.Articles
-                        .Where(a => a.AuthorId == usuarioId) 
+                        .Where(a => a.AuthorId == usuarioId && a.IsPublished == true)  
                         .Include(a => a.Author)
                         .Include(a => a.Category)
                         .Include(a => a.Source)
